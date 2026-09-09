@@ -142,7 +142,7 @@ genuinely different. Start over with `--reset-bank`, or re-harvest from your rep
 | Book a follow-up | Whether you named **two specific times**, and whether he accepted. |
 | Handle objections | Per objection: did you acknowledge before answering, and did you end on a question? |
 
-**Your five diagnosed leaks** (measured from the audio, not guessed):
+**Your measured failure modes** (from the audio, not guessed — 7 metrics, driven by the five diagnosed leaks):
 
 | Metric | What it catches |
 | --- | --- |
@@ -168,7 +168,9 @@ Each session writes to `sessions/<timestamp>/`:
   timings on every turn
 
 Plus one row per rep in **`sessions/history.csv`**, so you can watch the numbers move
-across reps the same way you'd track a funnel.
+across reps the same way you'd track a funnel. For a per-session progression of the
+headline metrics (criteria/5, opener latency, ack %, filler rate, longest turn,
+banned words, freezes), run `python trend.py`.
 
 ---
 
@@ -238,6 +240,7 @@ Get-Content .\tests\good_call.txt | .\.venv\Scripts\python.exe mock_call.py --te
 | `drill.py` | Pain-reveal drill loop (cost question + speed only) |
 | `paraphrase.py` | Paraphrase drill: beats, novelty scoring, the persisted ban list |
 | `regrade.py` | Re-score saved sessions with the current grader |
+| `trend.py` | Cross-session progress view of history.csv |
 | `run.bat` | Double-click launcher |
 | `drill.bat` | Double-click pain-reveal drill |
 | `paraphrase.bat` | Double-click paraphrase drill |
