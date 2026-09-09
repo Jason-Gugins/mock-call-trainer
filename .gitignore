@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtualenv
+.venv/
+
+# Session artifacts (recordings + reports are personal data, not source)
+sessions/
+MOCKCALL_SESSIONS/
+
+# Whisper model cache
+.cache/
+
+# Scratch build scripts (one-off, not part of the product)
+_build_*.py
+
+# Plan-mode artifacts
+.hermes/
+
+# OS / editor
+Thumbs.db
+.DS_Store
