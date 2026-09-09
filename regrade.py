@@ -90,8 +90,12 @@ def main() -> int:
 
     # Only recorded reps. A --text session has no timings to recover, so
     # re-scoring one would silently drop the audio-based metrics.
+    # Exclude *-drill dirs: the live app keeps drill history separate
+    # (drill_history.csv) and never touches history.csv, so folding a drill
+    # folder in here would write a junk 0/5 row and corrupt the funnel trend.
     reports = [p for p in sorted(SESSIONS.glob("*/report.md"))
-               if (p.parent / "session.wav").exists()]
+               if (p.parent / "session.wav").exists()
+               and not p.parent.name.endswith("-drill")]
     if not reports:
         print("No recorded sessions found.")
         return 1
