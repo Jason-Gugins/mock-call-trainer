@@ -34,6 +34,13 @@ class Parse(unittest.TestCase):
         self.assertIsNone(trend._num("none"))
         self.assertIsNone(trend._num("n/a"))
 
+    def test_filler_rate_is_per_100_not_count(self):
+        self.assertEqual(trend._filler_rate("2 in 349 words (0.6/100)"), 0.6)
+        self.assertEqual(trend._filler_rate("7 in 480 words (1.5/100)"), 1.5)
+        # no (rate/100) group: falls back to the generic parser, which treats
+        # strings starting with 'no' as missing
+        self.assertIsNone(trend._filler_rate("no filler"))
+
 
 class Tabulate(unittest.TestCase):
     def test_one_row_per_session(self):
@@ -44,6 +51,15 @@ class Tabulate(unittest.TestCase):
     def test_header_present(self):
         self.assertIn("session", trend.tabulate(ROWS))
         self.assertIn("crit", trend.tabulate(ROWS))
+
+    def test_filler_column_shows_rate_not_count(self):
+        # regression: this previously rendered the raw count (2 / 7), not the
+        # per-100-word rate (0.6 / 1.5) promised by the column legend.
+        out = trend.tabulate(ROWS)
+        self.assertIn("0.6", out)
+        self.assertIn("1.5", out)
+        self.assertNotIn("2 in", out)
+        self.assertNotIn("7 in", out)
 
 
 if __name__ == "__main__":

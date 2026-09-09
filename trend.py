@@ -39,6 +39,21 @@ def _num(raw):
     return float(m.group(0)) if m else None
 
 
+def _filler_rate(raw):
+    """history stores '2 in 349 words (0.6/100)' — return the RATE (0.6), not
+    the raw count, since the column legend promises filler words per 100."""
+    m = re.search(r"\((\d+(?:\.\d+)?)/100\)", (raw or ""))
+    if m:
+        return float(m.group(1))
+    return _num(raw)
+
+
+def _parse(key, raw):
+    if key == "filler_rate":
+        return _filler_rate(raw)
+    return _num(raw)
+
+
 def _fmt(v):
     if v is None:
         return "-"
@@ -48,7 +63,7 @@ def _fmt(v):
 def tabulate(rows) -> str:
     lines = ["session" + " " * 17 + " ".join(f"{label:>6}" for _, label in HEADLINE)]
     for r in rows:
-        args = [_fmt(_num(r.get(k, ""))) for k, _ in HEADLINE]
+        args = [_fmt(_parse(k, r.get(k, ""))) for k, _ in HEADLINE]
         lines.append(r.get("session", "?")[:22].ljust(24) + " ".join(f"{a:>6}" for a in args))
     return "\n".join(lines)
 
