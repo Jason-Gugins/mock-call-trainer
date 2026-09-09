@@ -639,7 +639,7 @@ def render_console(rep: Report) -> str:
             for line in c.evidence.split("\n"):
                 L.append(f"           {line.strip()}")
     L.append("")
-    L.append("YOUR FIVE DIAGNOSED LEAKS")
+    L.append("YOUR MEASURED FAILURE MODES")
     for lk in rep.leaks:
         L.append(f"  {lk.label}")
         L.append(f"      {lk.value}  ->  {lk.verdict}")
@@ -673,7 +673,7 @@ def render_markdown(rep: Report, session_id: str, wav_name: str) -> str:
         if c.evidence:
             L.append(f"**{c.name}** &mdash; {c.evidence.replace(chr(10), ' ')}")
             L.append("")
-    L.append("## Your five diagnosed leaks")
+    L.append("## Your measured failure modes")
     L.append("")
     L.append("| Metric | Measured | Verdict |")
     L.append("| --- | --- | --- |")

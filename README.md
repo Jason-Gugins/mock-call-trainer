@@ -142,7 +142,7 @@ genuinely different. Start over with `--reset-bank`, or re-harvest from your rep
 | Book a follow-up | Whether you named **two specific times**, and whether he accepted. |
 | Handle objections | Per objection: did you acknowledge before answering, and did you end on a question? |
 
-**Your measured failure modes** (from the audio, not guessed — 7 metrics, driven by the five diagnosed leaks):
+**Your measured failure modes** (measured from the audio, not guessed):
 
 | Metric | What it catches |
 | --- | --- |
@@ -153,6 +153,8 @@ genuinely different. Start over with `--reset-bank`, or re-harvest from your rep
 | Filler-word rate per 100 words | Filling silence out of nerves. Target under 3. |
 | Longest single turn | Monologuing. Flags anything over 130 words. |
 | Banned SaaS filler | Flags every use of visibility / efficiency / streamline / solution / pain points / synergy / game-changer, with the turn number. |
+| Dead-air freezes | Turns where you went silent and never answered. |
+| Your total talk time | How long you actually spoke (info only). |
 
 It finishes with a verdict — *would Reena believe you could take a real call next week?* —
 and the three things to fix on your next rep.
