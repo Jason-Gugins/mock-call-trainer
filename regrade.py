@@ -11,6 +11,7 @@ comparable to new ones, instead of comparing against a scoring bug.
 from __future__ import annotations
 
 import argparse
+import os
 import random
 import re
 from pathlib import Path
@@ -20,7 +21,7 @@ import grader as G
 import persona as P
 
 ROOT = Path(__file__).resolve().parent
-SESSIONS = ROOT / "sessions"
+SESSIONS = Path(os.environ.get("MOCKCALL_SESSIONS") or (ROOT / "sessions"))
 
 TURN_RE = re.compile(r"^\*\*YOU:\*\*\s*(.*?)\s*_\((.*?)\)_\s*$", re.MULTILINE)
 PM_RE = re.compile(r"^\*\*MIKE \(PM\):\*\*\s*(.*?)\s*$", re.MULTILINE)
