@@ -239,13 +239,14 @@ HOOK_MARKERS = (
 )
 
 
-def _landed(stage_id: str, text: str) -> bool:
+def _landed(stage_id: str, text: str, profile) -> bool:
     ack_q = grader.is_acknowledged(text) and grader.has_question(text)
     low = text.lower()
     if stage_id == "pickup":
         return grader.has_question(text) and 4 <= len(text.split()) <= 80
     if stage_id == "react_opener":
-        return any(m in low for m in HOOK_MARKERS) and not grader.mentions_capability(text)
+        markers = profile.hook_markers or HOOK_MARKERS
+        return any(m in low for m in markers) and not grader.mentions_capability(text)
     if stage_id in ("obj_paper", "obj_status", "obj_burned"):
         return ack_q
     if stage_id == "react_handle_1":
@@ -316,7 +317,7 @@ def run_call(args) -> None:
             pain_revealed = landed
         line = stage.line(meeting_booked if stage.id == "resolution" else landed)
 
-        print(f"MIKE (PM): {line}")
+        print(f"{profile.buyer_name} (PM): {line}")
         segments.append(voice.say(line))
         segments.append(pause)
 
@@ -328,7 +329,7 @@ def run_call(args) -> None:
             rec = recorder.record_turn()
             if rec.froze:
                 prompt = rng.choice(profile.freeze_prompts)
-                print(f"MIKE (PM): {prompt}")
+                print(f"{profile.buyer_name} (PM): {prompt}")
                 segments.append(voice.say(prompt))
                 segments.append(pause)
                 rec = recorder.record_turn()
@@ -355,13 +356,13 @@ def run_call(args) -> None:
             objection_label=stage.objection_label, froze=rec.froze and not said,
         ))
 
-        landed = _landed(stage.id, said)
+        landed = _landed(stage.id, said, profile)
         if stage.id == "obj_close":
             meeting_booked = len(grader.find_time_offers(said)) >= 2
         print()
 
     sign_off = profile.sign_off[meeting_booked]
-    print(f"MIKE (PM): {sign_off}")
+    print(f"{profile.buyer_name} (PM): {sign_off}")
     segments.append(voice.say(sign_off))
     print("\n  *click*\n")
 
@@ -402,7 +403,7 @@ def list_devices() -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Procore SDR mock cold call trainer",
+        description="Mock cold call trainer (profile-driven: generic_saas default, procore, ...)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("-d", "--difficulty", default="normal",
@@ -427,8 +428,9 @@ def main() -> None:
     p.add_argument("--paraphrase", action="store_true",
                    help="say the same idea a different way every time; reused wording is rejected")
     p.add_argument("--beat", default="opener",
-                   help="paraphrase target: opener, hook, obj_paper, discovery, cost, "
-                        "obj_burned, close, all, or a comma-separated list (default opener)")
+                   help="paraphrase target: opener, hook, obj_status, discovery, cost, "
+                        "obj_burned, close, all, or a comma-separated list (default opener; "
+                        "run --list-beats to see the active profile's beats)")
     p.add_argument("--max-run", type=int, default=5,
                    help="paraphrase: identical content words in a row that count as reciting")
     p.add_argument("--jaccard", type=float, default=0.70,

@@ -95,7 +95,7 @@ def run_live(args) -> None:
     print()
 
     def speak_cue(cue: str) -> None:
-        print(f"MIKE (PM): {cue}")
+        print(f"{profile.buyer_name} (PM): {cue}")
         if voice is not None:
             segments.append(voice.say(cue))
             segments.append(pause)

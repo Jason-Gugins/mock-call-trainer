@@ -170,6 +170,15 @@ class GradeGeneric(unittest.TestCase):
         self.assertGreaterEqual(len(pro), 5)
         self.assertEqual(len(gen), 0)
 
+    def test_procore_c1_missed_keeps_original_priority(self):
+        # regression: the coaching "Missed high-value" list must use the profile's
+        # c1_priority (original six incl. closeout), not a dict-insertion-order slice.
+        empty_turn = G.Turn(1, "pickup", "x", "", "", onset_latency=0.5)
+        rep = G.grade([empty_turn], "normal", True, True, profile=self.pro)
+        c1 = next(c for c in rep.criteria if c.key == "c1_industry_language")
+        self.assertIn("closeout", c1.evidence)
+        self.assertNotIn("as-built", c1.evidence)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -251,6 +251,7 @@ class Bank:
     """Everything already said per beat, persisted so novelty accrues across runs."""
 
     def __init__(self, path: Optional[Path] = None, profile=None):
+        self.profile = profile
         if path is None:
             path = BANK_PATH if profile is None else \
                 SESSIONS / f"paraphrase_bank_{profile.name}.json"
@@ -277,16 +278,26 @@ class Bank:
 
         Without this the first attempt of every beat is trivially 'fresh' -- the
         memorised version would sail through, which is the opposite of the point.
+
+        Walks the profile's own dir (sessions/<profile>/<ts>/report.md) and, for
+        the procore profile, the legacy flat sessions/<ts>/ layout too.
         """
         if not sessions_dir.exists():
             return 0
-        by_turn = {b.seed_turn: b.id for b in BEATS.values() if b.seed_turn}
+        profile = self.profile
+        beats = profile.beats if (profile is not None and profile.beats) else BEATS
+        by_turn = {b.seed_turn: b.id for b in beats.values() if b.seed_turn}
         added = 0
-        for folder in sorted(sessions_dir.iterdir()):
-            if not folder.is_dir() or folder.name.endswith("-drill"):
-                continue
-            report = folder / "report.md"
-            if not report.exists():
+
+        candidates: List[Path] = []
+        pname = profile.name if profile is not None else "?"
+        if profile is not None:
+            candidates += sorted((sessions_dir / pname).glob("*/report.md"))
+        if profile is None or pname == "procore":
+            candidates += sorted(sessions_dir.glob("*/report.md"))
+
+        for report in candidates:
+            if report.parent.name.endswith("-drill"):
                 continue
             says = [s.strip() for s in
                     re.findall(r"\*\*YOU:\*\*(.*)", report.read_text(encoding="utf-8"))]
@@ -583,7 +594,7 @@ def run_live(args) -> None:
     def speak_cue(beat: Beat, i: int) -> None:
         print(f"--- shot {i} / {args.reps}   [{beat.id}] {beat.instruction}")
         if beat.cue:
-            print(f"MIKE (PM): {beat.cue}")
+            print(f"{profile.buyer_name} (PM): {beat.cue}")
             if voice is not None:
                 segments.append(voice.say(beat.cue))
                 segments.append(pause)
@@ -644,8 +655,9 @@ def run_live(args) -> None:
         render_markdown(summary, shots, session_id, wav_name if not text_mode else ""),
         encoding="utf-8",
     )
-    append_history(SESSIONS / f"paraphrase_history_{profile.name}.csv", session_id, shots)
+    hist_csv = SESSIONS / f"paraphrase_history_{profile.name}.csv"
+    append_history(hist_csv, session_id, shots)
     print(f"  Report:  {outdir / 'report.md'}")
-    print(f"  History: {SESSIONS / 'paraphrase_history.csv'}")
+    print(f"  History: {hist_csv}")
     print(f"  Bank:    {bank.path}")
     print()

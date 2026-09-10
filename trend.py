@@ -73,13 +73,21 @@ def tabulate(rows) -> str:
     return "\n".join(lines)
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description="Per-session progression from history.csv")
+    ap.add_argument("--profile", default=None,
+                    help="only show one profile's rows (e.g. generic_saas); "
+                         "without it, mixed-profile rows are shown with a /profile suffix")
+    args = ap.parse_args(argv)
     path = SESSIONS / "history.csv"
     if not path.exists():
         print(f"No progress file at {path}")
         return 1
     with path.open(encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
+    if args.profile:
+        rows = [r for r in rows if r.get("profile") == args.profile]
     print(tabulate(rows))
     print("\nColumns: crit=criteria/5, open=opener latency s, obj-p=objection "
           "pause s, ack=ack % , fill=filler/100 words, long=longest turn words, "

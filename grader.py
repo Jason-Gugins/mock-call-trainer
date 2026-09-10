@@ -387,6 +387,7 @@ class Report:
     turns: List[Turn]
     difficulty: str
     profile: str = ""
+    buyer: str = ""
 
     @property
     def score_line(self) -> str:
@@ -407,11 +408,12 @@ def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
     # ---- 1. Relevant industry language -------------------------------------
     hv = find_matches(all_text, profile.high_value_terms)
     ctx = find_matches(all_text, profile.contextual_terms)
-    missed = [t for t in list(profile.high_value_terms)[:6] if t not in hv]
+    priority = profile.c1_priority or list(profile.high_value_terms)[:6]
+    missed = [t for t in priority if t not in hv]
     c1 = CriterionResult(
         "Relevant industry language",
         _level(len(hv) >= 5, len(hv) >= 3),
-        f"{len(hv)} high-value construction terms used, {len(ctx)} contextual.",
+        f"{len(hv)} high-value terms used, {len(ctx)} contextual.",
         "Used: " + (", ".join(hv) or "none")
         + ("\n  Missed high-value: " + ", ".join(missed) if missed else ""),
         key="c1_industry_language",
@@ -589,7 +591,7 @@ def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
         coach.append("Nothing failed. Push for STRONG on the criteria still at PASS.")
 
     return Report(criteria, leaks, verdict, passed, coach[:3], turns, difficulty,
-                  profile=profile.name)
+                  profile=profile.name, buyer=profile.buyer_name)
 
 
 # --------------------------------------------------------------------------
@@ -659,7 +661,7 @@ def render_markdown(rep: Report, session_id: str, wav_name: str) -> str:
     L.append("## Full transcript")
     L.append("")
     for t in rep.turns:
-        L.append(f"**MIKE (PM):** {t.pm_line}")
+        L.append(f"**{rep.buyer} (PM):** {t.pm_line}")
         L.append("")
         timing = []
         if t.onset_latency is not None:

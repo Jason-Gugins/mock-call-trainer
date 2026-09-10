@@ -6,6 +6,7 @@ re-score can never read from or write to the real sessions/ folder.
 from __future__ import annotations
 
 import hashlib
+import csv
 import os
 import subprocess
 import sys
@@ -93,6 +94,29 @@ class CliRegrade(unittest.TestCase):
             proc = self._run([], root)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertIn("2026-08-21_111111", proc.stdout)
+
+    def test_write_preserves_profile_in_history(self):
+        # regression: regrade --write must store the session's real profile in the
+        # history profile column, not hardcode 'procore'.
+        import csv as _csv
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prof = root / "generic_saas"
+            prof.mkdir()
+            d = prof / "2026-08-21_222222"
+            d.mkdir()
+            (d / "session.wav").write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+            (d / "report.md").write_text(
+                "# Mock Cold Call [generic_saas] - Session 2026-08-21_222222\n\n"
+                "- **Difficulty:** normal\n"
+                "- **Result:** 0/5 criteria at PASS or better\n"
+                "- **Verdict:** NO -- x\n"
+                "- **Audio:** `session.wav`\n", encoding="utf-8")
+            proc = self._run(["--write"], root)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            rows = list(_csv.DictReader((root / "history.csv").open(encoding="utf-8")))
+            self.assertTrue(rows)
+            self.assertEqual(rows[0].get("profile"), "generic_saas")
 
     def test_real_sessions_dir_untouched(self):
         # Snapshot FULL content digests of the real sessions dir, not just file

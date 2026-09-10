@@ -94,6 +94,8 @@ class Profile:
     beats: Dict[str, Beat] = field(default_factory=dict)
     beat_order: List[str] = field(default_factory=list)
     star_stories: List[str] = field(default_factory=list)
+    hook_markers: List[str] = field(default_factory=list)
+    c1_priority: List[str] = field(default_factory=list)
     build_script: Callable = None     # bound to build_script() by register()
 
 
@@ -380,6 +382,11 @@ register(Profile(
     beats=_generic_beats(),
     beat_order=list(GENERIC_BEAT_ORDER),
     star_stories=list(GENERIC_STAR_STORIES),
+    hook_markers=["pipeline", "crm", "churn", "churning", "forecast", "forecasts",
+                  "leads", "lead", "handoff", "hand-off", "revenue", "conversion",
+                  "quota", "demo", "dark", "follow up", "follow-up", "nurture"],
+    c1_priority=["pipeline", "crm", "conversion / kpi", "churn",
+                 "lead / mql / sql", "forecast / revenue"],
 ))
 
 
@@ -492,6 +499,12 @@ _procore = Profile(
     freeze_prompts=["Hello? You still there?", "You there?",
                     "I've got about ten seconds here, buddy."],
     sign_off={True: "Alright. Talk then.", False: "Yeah. Good luck."},
+    hook_markers=["talking to", "talking with", "been speaking", "other", "pms",
+                  "p m s", "contractors", "gcs", "construction act", "payment",
+                  "labour", "labor", "retire", "rework", "tariff", "market",
+                  "shortage", "prompt payment", "adjudication", "holdback", "peers"],
+    c1_priority=["RFI", "submittal", "change order", "closeout",
+                 "daily log", "drawing revision / superseded set"],
 )
 register(_procore)
 

@@ -19,12 +19,23 @@ from typing import List, Optional, Tuple
 
 import grader as G
 import persona as P
+import profiles
 
 ROOT = Path(__file__).resolve().parent
 SESSIONS = Path(os.environ.get("MOCKCALL_SESSIONS") or (ROOT / "sessions"))
 
 TURN_RE = re.compile(r"^\*\*YOU:\*\*\s*(.*?)\s*_\((.*?)\)_\s*$", re.MULTILINE)
-PM_RE = re.compile(r"^\*\*MIKE \(PM\):\*\*\s*(.*?)\s*$", re.MULTILINE)
+# Buyer label is per-profile (e.g. "Mike Delaney (PM)" / "Alex Moore (PM)").
+PM_RE = re.compile(r"^\*\*(.+?) \(PM\):\*\*\s*(.*?)\s*$", re.MULTILINE)
+
+PROFILE_RE = re.compile(r"# Mock Cold Call \[([\w-]+)\]")
+
+
+def profile_from_report(report: Path) -> "profiles.Profile":
+    text = report.read_text(encoding="utf-8")
+    m = PROFILE_RE.search(text)
+    name = m.group(1) if m else "procore"   # legacy flat dirs are procore
+    return profiles.get_profile(name)
 
 
 def _parse_timing(s: str) -> Tuple[Optional[float], float, List[float], bool]:
@@ -43,8 +54,10 @@ def _parse_timing(s: str) -> Tuple[Optional[float], float, List[float], bool]:
     return onset, dur, gaps, froze
 
 
-def load_session(report: Path) -> Tuple[List[G.Turn], str, bool, bool]:
+def load_session(report: Path):
+    "-> (turns, difficulty, pain_revealed, meeting_booked, profile)"
     text = report.read_text(encoding="utf-8")
+    profile = profile_from_report(report)
 
     diff = "normal"
     m = re.search(r"\*\*Difficulty:\*\*\s*(\w+)", text)
@@ -55,9 +68,9 @@ def load_session(report: Path) -> Tuple[List[G.Turn], str, bool, bool]:
     pain_revealed = "named a real headache" in text
     meeting_booked = "meeting BOOKED" in text
 
-    # Stage metadata is fixed in order; only the PM's wording is randomized, so
-    # any seed gives the right is_objection / expects for turn N.
-    stages = P.build_script(diff, random.Random(0))
+    # Stage metadata is fixed in order; only the buyer's wording is randomized,
+    # so any seed gives the right is_objection / expects for turn N.
+    stages = P.build_script(diff, random.Random(0), profile)
     pm_lines = PM_RE.findall(text)
 
     turns: List[G.Turn] = []
@@ -79,7 +92,7 @@ def load_session(report: Path) -> Tuple[List[G.Turn], str, bool, bool]:
             objection_label=st.objection_label,
             froze=froze,
         ))
-    return turns, diff, pain_revealed, meeting_booked
+    return turns, diff, pain_revealed, meeting_booked, profile
 
 
 def main() -> int:
@@ -117,8 +130,8 @@ def main() -> int:
         m = re.search(r"\*\*Verdict:\*\*\s*(\w+(?:\s+\w+)?)", old_text)
         old_verdict = (m.group(1) if m else "?").split("--")[0].strip()
 
-        turns, diff, pain, booked = load_session(rep_path)
-        rep = G.grade(turns, diff, pain, booked)
+        turns, diff, pain, booked, profile = load_session(rep_path)
+        rep = G.grade(turns, diff, pain, booked, profile=profile)
         new_verdict = rep.verdict.split("--")[0].strip()
         pbp = next((l.value for l in rep.leaks if l.key == "pitch_before_pain"), "?")
 

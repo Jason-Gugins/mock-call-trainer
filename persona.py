@@ -32,7 +32,8 @@ FREEZE_PROMPTS = _PROCORE.freeze_prompts
 SIGN_OFF = _PROCORE.sign_off
 
 
-def _procore_script(difficulty: str, rng: random.Random) -> List[Stage]:
+def _procore_script(difficulty: str, rng: random.Random,
+                    profile=None) -> List[Stage]:
     """The original Procore construction call. Kept byte-identical: stage ids
     include 'obj_paper' which mock_call._landed and regrade depend on."""
     if difficulty not in DIFFICULTIES:
