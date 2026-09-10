@@ -1,9 +1,21 @@
-# Mock Cold Call Trainer — Procore SDR Role-Play
+# Mock Cold Call Trainer (profile-driven SaaS BDR/SDR)
 
-A live cold-call drill for the Skillset round on Friday. You speak into the mic, a
-skeptical Senior Project Manager talks back out loud, and at the end you get graded
-against Procore's five published role-play criteria plus the five failure modes from
-your own job-hunt diagnosis. Every session is recorded.
+A live cold-call trainer. You speak into the mic, a skeptical buyer talks back,
+and at the end you get graded against five SDR role-play criteria plus your gauged
+failure modes. Every session is recorded, so you can listen back and watch the
+numbers move. It's **profile-driven**: every company's persona, objections,
+vocabulary, and paraphrase beats live in a profile, so the same trainer prepares
+you for Procore, a generic SaaS employer, or any company you add.
+
+```
+python mock_call.py                    # default: generic_saas profile
+python mock_call.py --profile procore  # the original construction role-play
+python mock_call.py --list-profiles    # see what's registered
+```
+
+**Procore** is kept as one example profile; **generic_saas** (buyer "Alex", VP of
+Ops) is the default. Add your real target — BoostSecurity, Mentimeter, Levitate —
+by copying a profile (see "Adding a company profile" below).
 
 Built to run the **Wed 19th** drill from the Mock Call Roleplay Playbook: *"Run three
 full mock calls out loud. Do them badly — the point is reps, not polish. Note every
@@ -18,12 +30,29 @@ Double-click **`run.bat`**, or from a terminal:
 
 ```powershell
 cd C:\Users\Jason\Documents\Interview\mock_call_trainer
-.\.venv\Scripts\python.exe mock_call.py
+.\.venv\Scripts\python.exe mock_call.py --profile generic_saas
 ```
 
-Wear headphones so the mic doesn't record the PM's voice back into your turn.
+Wear headphones so the mic doesn't record the buyer's voice back into your turn.
 
 First run downloads the transcription model (~75 MB) once, then works offline.
+
+---
+
+## Profiles
+
+Each profile is a `register(Profile(...))` block in `profiles.py` holding the
+company-specific everything: buyer name/title, objection pools, pain cues,
+high-value vocabulary, the whisper transcription primer, and the paraphrase
+beats. Pick one with `--profile <name>`; `--list-profiles` shows what's loaded.
+
+**Adding a company profile:** copy the `generic_saas` block in `profiles.py`,
+rename `name`/`display`, then fill the four fields that actually matter:
+`company`/`buyer_name`/`buyer_title`/`objective`, `pain_reveal`+`pain_drill_cues`
+(the real pains a BDR for them would hunt), `objection_pools` (status_quo / burned /
+close / close_alt), and `high_value_terms`+`whisper_primer` (the buyer's vocabulary
+that makes you sound native). Sanity-check with `mock_call.py --text --profile <name>`
+(no mic) so the script reads sensibly, then confirm c1 lights up on a one-line trial.
 
 ---
 
@@ -190,10 +219,15 @@ banned words, freezes), run `python trend.py`.
 | `--seed` | Fix the objection phrasing for a repeatable run. |
 | `--drill` | Pain-reveal only: 10 shots or 3 minutes, cost question + speed. |
 | `--paraphrase` | Same idea, new wording every time. Reused phrasing is rejected. |
-| `--beat` | Paraphrase target: `opener` (default), `hook`, `obj_paper`, `discovery`, `cost`, `obj_burned`, `close`, `all`, or a comma-separated list. |
+| `--beat` | Paraphrase target: `opener` (default), `hook`, `obj_status`, `discovery`, `cost`, `obj_burned`, `close`, `all`, or a comma-separated list (see `--list-beats` for the active profile's beats). |
 | `--list-beats` | Show the paraphrase beats and exit. |
 | `--max-run` | Identical content words in a row that count as reciting (default 5). |
 | `--jaccard` | Content-word overlap that counts as reciting (default 0.70). |
+| `--profile` | Company profile: `generic_saas` (default), `procore`, or any you add. |
+| `--list-profiles` | List registered profiles and exit. |
+| `--objection` | Objection first-15-seconds reflex drill: label, negative-reverse, or feel/felt/found within 2s. |
+| `--star` | STAR story drill: each answer needs a number + a full situation/task/action/result arc, ~60s. |
+| `--narrative` | Career-narrative drill: why sales / why this company / the 2018-2023 gap answer. |
 | `--reseed` | Re-harvest the paraphrase ban list from past session reports. |
 | `--reset-bank` | Wipe the paraphrase ban list and start over. |
 | `--reps` | Shot count (default 10). Used by `--drill` and `--paraphrase`. |
@@ -223,11 +257,12 @@ Verifies the whole speech path (Windows TTS → transcription → grader) withou
 .\.venv\Scripts\python.exe tests\test_pipeline.py
 ```
 
-`tests/good_call.txt` and `tests/weak_call.txt` are reference transcripts — piping them
-into `--text` mode should score 5/5 and 0/5 respectively:
+`tests/good_call.txt` and `tests/weak_call.txt` are Procore (construction) reference
+transcripts — piping them into `--text --profile procore` should score 5/5 and 0/5:
 
 ```powershell
-Get-Content .\tests\good_call.txt | .\.venv\Scripts\python.exe mock_call.py --text
+Get-Content .\tests\good_call.txt | .\.venv\Scripts\python.exe mock_call.py --text --profile procore
+Get-Content .\tests\weak_call.txt | .\.venv\Scripts\python.exe mock_call.py --text --profile procore
 ```
 
 ---
@@ -237,16 +272,21 @@ Get-Content .\tests\good_call.txt | .\.venv\Scripts\python.exe mock_call.py --te
 | File | Purpose |
 | --- | --- |
 | `mock_call.py` | Call loop, mic capture and timing, transcription, session recording |
-| `persona.py` | Mike Delaney's dialogue, the objection pools, difficulty settings |
-| `grader.py` | Rubric scoring, vocabulary and filler banks, report rendering |
+| `profiles.py` | Per-company profiles (`generic_saas` default, `procore` example) + the `Profile`/`Beat` model |
+| `persona.py` | Procore's original construction builder + legacy constant aliases |
+| `grader.py` | Rubric scoring, vocabulary and filler banks, report rendering, drill graders |
 | `drill.py` | Pain-reveal drill loop (cost question + speed only) |
 | `paraphrase.py` | Paraphrase drill: beats, novelty scoring, the persisted ban list |
-| `regrade.py` | Re-score saved sessions with the current grader |
-| `trend.py` | Cross-session progress view of history.csv |
+| `objection.py` | Objection first-15s reflex drill |
+| `star.py` | STAR story drill |
+| `narrative.py` | Career-narrative + gap-answer drill |
+| `regrade.py` | Re-score saved sessions with the current grader (profile-aware) |
+| `trend.py` | Cross-session progress view of history.csv (optional `--profile`) |
 | `run.bat` | Double-click launcher |
 | `drill.bat` | Double-click pain-reveal drill |
 | `paraphrase.bat` | Double-click paraphrase drill |
-| `sessions/` | Recordings, reports, history.csv, drill_history.csv, paraphrase_bank.json |
+| `objection.bat` / `star.bat` / `narrative.bat` | Double-click launchers for the new drills |
+| `sessions/` | Recordings, reports, history.csv (per-profile rows), drill/star/objection/narrative history |
 
 Set `MOCKCALL_SESSIONS` to redirect all output somewhere else. The CLI tests use it so
 they can't append fake rows to your real history or drop junk folders next to your reps.
