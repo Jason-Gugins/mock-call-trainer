@@ -102,6 +102,11 @@ GOALS = {
 }
 
 
+def _profile_rows(path, profile):
+    rows = _csv_rows(path)
+    return [r for r in rows if (r.get("profile") or "procore") == profile]
+
+
 def main(argv=None) -> int:
     import argparse
     ap = argparse.ArgumentParser(description="Per-profile progress vs goal + coach")
@@ -111,14 +116,12 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     profile = args.profile or "generic_saas"
     agg = {
-        **aggregate_full(_csv_rows(SESSIONS / "history.csv")),
-        **aggregate_objection(_csv_rows(SESSIONS / "objection_history.csv")),
-        **aggregate_star(_csv_rows(SESSIONS / "star_history.csv")),
-        **aggregate_narrative(_csv_rows(SESSIONS / "narrative_history.csv")),
-        **aggregate_drill(_csv_rows(SESSIONS / "drill_history.csv")),
+        **aggregate_full(_profile_rows(SESSIONS / "history.csv", profile)),
+        **aggregate_objection(_profile_rows(SESSIONS / "objection_history.csv", profile)),
+        **aggregate_star(_profile_rows(SESSIONS / "star_history.csv", profile)),
+        **aggregate_narrative(_profile_rows(SESSIONS / "narrative_history.csv", profile)),
+        **aggregate_drill(_profile_rows(SESSIONS / "drill_history.csv", profile)),
     }
-    # NOTE (D1/data) once every CSV carries a profile column, filter rows by
-    # profile here before aggregating; until then this is all-profiles.
     lines = [f"PROGRESS  profile={profile}", ""]
     lines.append(f"{'metric':22} {'now':>8} {'goal':>6}  mg")
     for k, v in agg.items():

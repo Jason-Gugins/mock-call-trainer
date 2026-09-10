@@ -47,5 +47,16 @@ class Coach(unittest.TestCase):
         self.assertIn("--star", cmds)
         self.assertNotIn("--objection", cmds)   # ack fine
 
+    def test_main_filters_by_profile(self):
+        import unittest.mock as mock
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Path(tmp)
+            _write(s / "objection_history.csv", ["session","verdict","reflex","onset","profile"],
+                   [["s1","FAST","Y","1.0","levitate"], ["s2","MISS","N","0.5","boostsecurity"]])
+            # patch SESSIONS and re-run main
+            with mock.patch.object(P, "SESSIONS", s):
+                rows = P._profile_rows(s / "objection_history.csv", "levitate")
+            self.assertEqual(len(rows), 1)
+
 if __name__ == "__main__":
     unittest.main()
