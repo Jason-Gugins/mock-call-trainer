@@ -429,6 +429,8 @@ def main() -> None:
                    help="say the same idea a different way every time; reused wording is rejected")
     p.add_argument("--objection", action="store_true",
                    help="objection first-15s reflex drill: label, negative-reverse, feel/felt/found")
+    p.add_argument("--star", action="store_true",
+                   help="STAR story drill: number + full situation/task/action/result arc")
     p.add_argument("--beat", default="opener",
                    help="paraphrase target: opener, hook, obj_status, discovery, cost, "
                         "obj_burned, close, all, or a comma-separated list (default opener; "
@@ -473,6 +475,10 @@ def main() -> None:
     if args.objection:
         import objection
         objection.run_live(args)
+        return
+    if args.star:
+        import star
+        star.run_live(args)
         return
     try:
         run_call(args)

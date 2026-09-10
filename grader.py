@@ -875,3 +875,109 @@ def append_objection_history(csv_path: Path, session_id: str,
                 "reflex": "Y" if s.reflex else "N", "onset": onset,
                 "elapsed_s": f"{elapsed_s:.1f}", "text": s.text, "cue": s.cue,
             })
+
+
+# --------------------------------------------------------------------------
+# STAR story drill (--star)
+# --------------------------------------------------------------------------
+
+# Heuristics for "did the STAR skeleton + a number survive". Deliberately
+# lenient: they gate presence of each element, never word-perfect judgment.
+STAR_ARC_MARKERS = {
+    "situation": (r"\b(at|in|when|while|as|during)\b.{0,40}"
+                  r"\b(job|team|store|role|project|office|site|work|drive|window"
+                  r"|summer|shift|restaurant|hospital|storefront)\b"),
+    "task": r"\bi (had|needed|was asked|was responsible|had to|was put|was in charge)\b",
+    "action": (r"\bi (built|ran|created|set up|launched|wrote|measured|improved|coded"
+               r"|designed|trained|led|tracked|cut|raised|increased|lowered|reworked"
+               r"|streamlined|rebuilt|mapped)\b"),
+    "result": (r"\b(so\b|which meant|outcome|result|because of|ended up|in the end"
+               r"|and that|cut it|dropped|rose to)\b"),
+}
+
+
+def score_star_shot(text: str, duration: Optional[float] = None,
+                    target_s: Tuple[float, float] = (45.0, 90.0)) -> List[str]:
+    """Returns the list of missing STAR elements. Empty list == solid story."""
+    low = _norm(text)
+    missing = [k for k, pat in STAR_ARC_MARKERS.items() if not re.search(pat, low)]
+    if not re.search(r"\d+(?:\.\d+)?", low):
+        missing.append("a specific number")
+    if duration is not None and not (target_s[0] <= duration <= target_s[1]):
+        missing.append("wrong length")
+    return missing
+
+
+@dataclass
+class StarShot:
+    index: int
+    topic: str
+    text: str
+    duration: Optional[float]
+    missing: List[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.missing
+
+
+@dataclass
+class StarSummary:
+    n: int
+    passed: int
+    elapsed_s: float
+    reps_requested: int
+
+    @property
+    def line(self) -> str:
+        return (f"STAR  {self.passed}/{self.n} stories solid  "
+                f"(each needs a situation, task, action, result, and a number)")
+
+
+def summarize_star(shots: List[StarShot], elapsed_s: float,
+                   reps_requested: int) -> StarSummary:
+    return StarSummary(n=len(shots), passed=sum(1 for s in shots if s.ok),
+                       elapsed_s=elapsed_s, reps_requested=reps_requested)
+
+
+STAR_HISTORY_FIELDS = ["session", "shot", "topic", "ok", "missing", "duration",
+                       "elapsed_s", "text"]
+
+
+def render_star_markdown(summary: StarSummary, shots: List[StarShot],
+                         session_id: str, wav_name: str) -> str:
+    L = [f"# STAR story drill - {session_id}", ""]
+    L.append(f"- **Result:** {summary.line}")
+    L.append(f"- **Elapsed:** {summary.elapsed_s:.0f}s")
+    if wav_name:
+        L.append(f"- **Audio:** `{wav_name}`")
+    L.append("")
+    L.append("| Story | Topic | Solid | Missing |")
+    L.append("| --- | --- | --- | --- |")
+    for s in shots:
+        L.append(f"| {s.index} | {s.topic} | {'YES' if s.ok else 'NO'} | "
+                 f"{'; '.join(s.missing) or '—'} |")
+    L.append("")
+    for s in shots:
+        L.append(f"**Story {s.index} ({s.topic})**")
+        L.append("")
+        L.append(f"> {s.text or '[silence]'}")
+        L.append("")
+    return "\n".join(L)
+
+
+def append_star_history(csv_path: Path, session_id: str, shots: List[StarShot],
+                        elapsed_s: float) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    new = not csv_path.exists()
+    with csv_path.open("a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=STAR_HISTORY_FIELDS, extrasaction="ignore")
+        if new:
+            w.writeheader()
+        for s in shots:
+            w.writerow({
+                "session": session_id, "shot": s.index, "topic": s.topic,
+                "ok": "Y" if s.ok else "N", "missing": "; ".join(s.missing),
+                "duration": "" if s.duration is None else f"{s.duration:.0f}",
+                "elapsed_s": f"{elapsed_s:.1f}", "text": s.text,
+            })
