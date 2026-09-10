@@ -1,148 +1,45 @@
+"""The prospect, sourced from the active profile.
+
+Persona data now lives in profiles (per-company). This module keeps the
+Procore-specific construction builder and a set of deprecated constant aliases
+so the old call sites keep working while the engine migrates onto profiles.
+New call sites should read from profiles.get_profile(...) instead.
 """
-The prospect: Mike Delaney, Senior Project Manager at a mid-size GTA general contractor.
+from __future__ import annotations
 
-Persona per Procore's role-play brief: influential but skeptical, burned by tech
-before, runs every job on pen and paper, and it's causing him real headaches.
-
-The call is a fixed sequence of stages. At each stage the PM picks a line variant
-based on how the candidate's last turn actually scored, so the prospect gets warmer
-when you handle him well and colder when you don't. No LLM involved -- the branching
-is driven by the same deterministic checks the grader uses.
-"""
-
-from dataclasses import dataclass, field
-from typing import Dict, List
 import random
+from typing import List
 
-PM_NAME = "Mike Delaney"
-PM_COMPANY = "Delaney Construction Group"
+from profiles import PROFILE, Stage, get_profile, build_script as generic_build_script
 
+# Deprecated: all of these are Procore (construction) values for backward
+# compatibility. Prefer profiles.get_profile("procore") going forward.
+_PROCORE = get_profile("procore")
+
+PM_NAME = _PROCORE.buyer_name
+PM_COMPANY = _PROCORE.company
 DIFFICULTIES = ("normal", "hostile", "apathetic", "timepoor")
-
-# Speech rate for the Windows SAPI voice (-10..10). Faster = more pressure.
-DIFFICULTY_RATE = {"normal": 0, "hostile": 2, "apathetic": -1, "timepoor": 3}
-
-
-@dataclass
-class Stage:
-    """One PM turn, plus what the candidate is expected to do in response."""
-
-    id: str
-    expects: str                      # what good looks like from the candidate next
-    good: str                         # PM line if the previous turn landed
-    poor: str = ""                    # PM line if it didn't (defaults to `good`)
-    is_objection: bool = False
-    objection_label: str = ""
-    coach_note: str = ""              # shown in the transcript, not spoken
-
-    def line(self, landed: bool) -> str:
-        if landed or not self.poor:
-            return self.good
-        return self.poor
+DIFFICULTY_RATE = _PROCORE.difficulty_rates
+PICKUP = _PROCORE.pickup
+REACT_OPENER = _PROCORE.react_opener
+OBJ_PAPER = _PROCORE.objection_pools["status_quo"]
+OBJ_BURNED = _PROCORE.objection_pools["burned"]
+OBJ_CLOSE = _PROCORE.objection_pools["close"]
+OBJ_CLOSE_ALT = _PROCORE.objection_pools["close_alt"]
+PAIN_REVEAL = _PROCORE.pain_reveal
+PAIN_DRILL_CUES = _PROCORE.pain_drill_cues
+FREEZE_PROMPTS = _PROCORE.freeze_prompts
+SIGN_OFF = _PROCORE.sign_off
 
 
-# --------------------------------------------------------------------------
-# Opening lines by difficulty
-# --------------------------------------------------------------------------
-
-PICKUP = {
-    "normal": "Mike Delaney.",
-    "hostile": "Yeah? Who's this.",
-    "apathetic": "This is Mike.",
-    "timepoor": "Delaney. Make it quick, I'm out on site.",
-}
-
-REACT_OPENER = {
-    "normal": (
-        "Alright. Thirty seconds. Go ahead.",
-        "Hang on, who is this? Are you selling me something?",
-    ),
-    "hostile": (
-        "You've got one sentence, and then I'm hanging up.",
-        "I don't take cold calls. What do you want?",
-    ),
-    "apathetic": (
-        "Sure, I guess. Go ahead.",
-        "Look, I'm not really in the market for anything.",
-    ),
-    "timepoor": (
-        "Fine, go, but I've got about a minute before I lose you.",
-        "I'm walking a job right now. What is this about?",
-    ),
-}
-
-# --------------------------------------------------------------------------
-# Objection pools -- phrasing varies run to run so you can't memorise a script
-# --------------------------------------------------------------------------
-
-OBJ_PAPER = [
-    "Let me save you some time. We've run jobs on paper for thirty years and it works "
-    "fine. I've got binders in my truck that have never once crashed on me.",
-    "I'll stop you there. Thirty years we've done this with paper and a pencil, and we "
-    "still hand jobs over on time. Why would I change that now?",
-    "Honestly? We've been doing it the same way since before you were born and it works. "
-    "Paper doesn't need a password.",
-]
-
-OBJ_BURNED = [
-    "Here's my problem though. We bought a system four, five years back. Paid for it, sat "
-    "through the training, and nobody in the field touched it. Guys went straight back to "
-    "paper. I'm not doing that again.",
-    "We already tried this. Bought a platform, big rollout, and six months later everyone "
-    "was back on paper and we were still paying for it. Burned me pretty good.",
-    "Last time we brought software in, it was a disaster. The office loved it, the field "
-    "wouldn't touch it, and I'm the one who had to run the job in the middle of that.",
-]
-
-OBJ_CLOSE = [
-    "Alright, look. Just send me an email and I'll take a look when I get a minute.",
-    "Do me a favour and just email me something. I don't have time for another call.",
-    "Send me an email. If it's worth it I'll get back to you.",
-]
-
-OBJ_CLOSE_ALT = [
-    "Before we go further, what does something like this run? Give me a number.",
-    "Hold on. How much is this going to cost me?",
-]
-
-# What the PM gives up once you've actually asked him something real.
-PAIN_REVEAL = [
-    "Honestly? Closeout. Every single job, the last three weeks is me and a coordinator "
-    "digging through paper trying to build the binder. And change orders -- half of them "
-    "get built before anybody signs off, and then I'm the one eating it.",
-    "If I'm being straight with you, it's the change orders and the drawings. We had a "
-    "crew on the Dundas job frame off a set the architect had already revised. Cost us the "
-    "better part of a week to tear it out and redo it.",
-    "The daily logs, mostly. My super writes them from memory at six o'clock at night, and "
-    "then when the owner comes back with a delay claim, I've got nothing solid to point at.",
-]
-
-
-# Short punches for --drill only. Full-call PAIN_REVEAL stays long.
-# Mapped 1:1 to the v1 implication bank "when he says" column.
-PAIN_DRILL_CUES = [
-    "We had a crew on the Dundas job frame off a set the architect had already revised. Cost us the better part of a week.",
-    "Closeout. Every job, the last three weeks is me and a coordinator digging through paper trying to build the binder.",
-    "Half the change orders get built before anybody signs off, and then I'm the one eating it.",
-    "The daily logs, mostly. My super writes them from memory at six o'clock at night, and when the owner comes back with a delay claim I've got nothing solid.",
-    "RFIs sit in a truck for two weeks and the crew's either standing around or building ahead off a guess.",
-]
-
-
-def pain_drill_cues(n: int, rng: random.Random) -> List[str]:
-    """n cues, shuffled then cycled, so ten shots are not the same sentence ten times."""
-    order = list(PAIN_DRILL_CUES)
-    rng.shuffle(order)
-    return [order[i % len(order)] for i in range(n)]
-
-
-def build_script(difficulty: str, rng: random.Random) -> List[Stage]:
-    """Assemble the PM's side of the call for one session."""
+def _procore_script(difficulty: str, rng: random.Random) -> List[Stage]:
+    """The original Procore construction call. Kept byte-identical: stage ids
+    include 'obj_paper' which mock_call._landed and regrade depend on."""
     if difficulty not in DIFFICULTIES:
         raise ValueError(f"unknown difficulty {difficulty!r}")
 
     good_open, poor_open = REACT_OPENER[difficulty]
-    close_pool = OBJ_CLOSE + (OBJ_CLOSE_ALT if rng.random() < 0.35 else [])
+    close_pool = list(OBJ_CLOSE) + (list(OBJ_CLOSE_ALT) if rng.random() < 0.35 else [])
 
     return [
         Stage(
@@ -219,14 +116,25 @@ def build_script(difficulty: str, rng: random.Random) -> List[Stage]:
     ]
 
 
-# Said when you go silent long enough that a real prospect would prompt you.
-FREEZE_PROMPTS = [
-    "Hello? You still there?",
-    "You there?",
-    "I've got about ten seconds here, buddy.",
-]
+# Exposed as `persona.build_script(difficulty, rng, profile=None)`.
+# A profile that declares no custom builder falls back to the generic builder.
+def build_script(difficulty: str, rng: random.Random,
+                 profile=None) -> List[Stage]:
+    if profile is None:
+        profile = _PROCORE
+    if profile is _PROCORE:
+        return _procore_script(difficulty, rng)
+    return generic_build_script(difficulty, rng, profile)
 
-SIGN_OFF = {
-    True: "Alright. Talk then.",
-    False: "Yeah. Good luck.",
-}
+
+def pain_drill_cues(n: int, rng: random.Random, profile=None) -> List[str]:
+    if profile is None:
+        profile = _PROCORE
+    order = list(profile.pain_drill_cues)
+    rng.shuffle(order)
+    return [order[i % len(order)] for i in range(n)]
+
+
+# Bind the Procore profile to its original construction builder (not the
+# generic one) so behavior is byte-identical.
+_PROCORE.build_script = _procore_script
