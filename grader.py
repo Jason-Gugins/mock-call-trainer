@@ -755,3 +755,123 @@ def append_drill_history(
                 "text": s.text,
                 "cue": s.pm_line,
             })
+
+
+# --------------------------------------------------------------------------
+# Objection first-15-seconds reflex (--objection)
+# --------------------------------------------------------------------------
+
+# Reflexive moves a candidate should open with inside ~2s of a brush-off:
+# Voss labeling, Sandler negative reverse, feel/felt/found, or a curiosity
+# question. Anything else (a defensive pitch) is a MISS.
+OBJECTION_REFLEX_MARKERS = (
+    r"\bit sounds like\b", r"\bit seems like\b",
+    r"\bso you'?re (saying|telling me|saying that)\b",
+    r"\bcorrect me if\b", r"\bi hear (you|ya)\b",
+    r"\bthat makes sense\b", r"\bmakes sense\b", r"\bfair enough\b",
+    r"\bwhat would (have to|it take|that take)\b",
+    r"\bwhat[^?.]{0,25}be true\b",
+    r"\bwhat happened\b", r"\bwhich part\b", r"\bwas it (the|a)\b",
+    r"\bhow (did|does|had) that\b", r"\bhave? you (ever|considered|thought)\b",
+    r"\bfelt\b", r"\bfeel like\b", r"\bfound that\b",
+)
+
+
+def score_objection_shot(text: str, onset: Optional[float] = None,
+                         froze: bool = False) -> Tuple[bool, str]:
+    """Did you open with a reflexive objection move within ~2s?
+
+    Returns (reflex_hit, verdict): MISS if no reflexive move, HIT in text mode
+    (no clock), FAST <=2.0s, SLOW otherwise.
+    """
+    if froze or not (text or "").strip():
+        return False, "MISS"
+    low = _norm(text)
+    reflexive = any(re.search(m, low) for m in OBJECTION_REFLEX_MARKERS)
+    if not reflexive:
+        return False, "MISS"
+    if onset is None:
+        return True, "HIT"
+    return (True, "FAST") if onset <= 2.0 else (True, "SLOW")
+
+
+@dataclass
+class ObjectionShot:
+    index: int
+    cue: str
+    text: str
+    onset_latency: Optional[float]
+    froze: bool
+    reflex: bool
+    verdict: str
+
+
+@dataclass
+class ObjectionSummary:
+    n: int
+    hits: int
+    fast: int
+    slow: int
+    miss: int
+    elapsed_s: float
+    reps_requested: int
+
+    @property
+    def line(self) -> str:
+        return (f"OBJECTION  {self.hits}/{self.n} reflexive  "
+                f"({self.fast} FAST, {self.slow} SLOW, {self.miss} MISS)")
+
+
+def summarize_objection(shots: List[ObjectionShot], elapsed_s: float,
+                        reps_requested: int) -> ObjectionSummary:
+    return ObjectionSummary(
+        n=len(shots),
+        hits=sum(1 for s in shots if s.reflex),
+        fast=sum(1 for s in shots if s.verdict == "FAST"),
+        slow=sum(1 for s in shots if s.verdict == "SLOW"),
+        miss=sum(1 for s in shots if s.verdict == "MISS"),
+        elapsed_s=elapsed_s,
+        reps_requested=reps_requested,
+    )
+
+
+OBJECTION_HISTORY_FIELDS = ["session", "shot", "verdict", "reflex", "onset",
+                            "elapsed_s", "text", "cue"]
+
+
+def render_objection_markdown(summary: ObjectionSummary, shots: List[ObjectionShot],
+                              session_id: str, wav_name: str) -> str:
+    L = [f"# Objection reflex drill - {session_id}", ""]
+    L.append(f"- **Result:** {summary.line}")
+    L.append(f"- **Elapsed:** {summary.elapsed_s:.0f}s")
+    if wav_name:
+        L.append(f"- **Audio:** `{wav_name}`")
+    L.append("")
+    L.append("| Shot | Verdict | Onset | You said |")
+    L.append("| --- | --- | --- | --- |")
+    for s in shots:
+        onset = "n/a" if s.onset_latency is None else f"{s.onset_latency:.1f}s"
+        you = (s.text or "[silence]").replace("|", "/")
+        L.append(f"| {s.index} | **{s.verdict}** | {onset} | {you} |")
+    L.append("")
+    for s in shots:
+        L.append(f"**Cue {s.index}:** {s.cue}")
+        L.append("")
+    return "\n".join(L)
+
+
+def append_objection_history(csv_path: Path, session_id: str,
+                             shots: List[ObjectionShot], elapsed_s: float) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    new = not csv_path.exists()
+    with csv_path.open("a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=OBJECTION_HISTORY_FIELDS, extrasaction="ignore")
+        if new:
+            w.writeheader()
+        for s in shots:
+            onset = "" if s.onset_latency is None else f"{s.onset_latency:.1f}"
+            w.writerow({
+                "session": session_id, "shot": s.index, "verdict": s.verdict,
+                "reflex": "Y" if s.reflex else "N", "onset": onset,
+                "elapsed_s": f"{elapsed_s:.1f}", "text": s.text, "cue": s.cue,
+            })

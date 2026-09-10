@@ -427,6 +427,8 @@ def main() -> None:
     p.add_argument("--minutes", type=float, default=3.0, help="drill time budget in minutes")
     p.add_argument("--paraphrase", action="store_true",
                    help="say the same idea a different way every time; reused wording is rejected")
+    p.add_argument("--objection", action="store_true",
+                   help="objection first-15s reflex drill: label, negative-reverse, feel/felt/found")
     p.add_argument("--beat", default="opener",
                    help="paraphrase target: opener, hook, obj_status, discovery, cost, "
                         "obj_burned, close, all, or a comma-separated list (default opener; "
@@ -467,6 +469,10 @@ def main() -> None:
     if args.drill:
         import drill
         drill.run_live(args)
+        return
+    if args.objection:
+        import objection
+        objection.run_live(args)
         return
     try:
         run_call(args)
