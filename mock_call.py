@@ -35,6 +35,7 @@ import numpy as np
 
 import grader
 import persona
+import profiles
 from grader import Turn
 
 ROOT = Path(__file__).resolve().parent
@@ -199,9 +200,11 @@ class Recorder:
 
 
 class Transcriber:
-    def __init__(self, model_name: str = "base.en", beam: int = 5):
+    def __init__(self, model_name: str = "base.en", beam: int = 5,
+                 initial_prompt: Optional[str] = WHISPER_PRIMER):
         self.model_name = model_name
         self.beam = beam
+        self.prompt = initial_prompt
         self._model = None
 
     def _load(self):
@@ -219,7 +222,7 @@ class Transcriber:
         model = self._load()
         segments, _ = model.transcribe(
             audio, language="en", beam_size=self.beam,
-            vad_filter=True, initial_prompt=WHISPER_PRIMER,
+            vad_filter=True, initial_prompt=self.prompt,
         )
         return " ".join(s.text.strip() for s in segments).strip()
 
@@ -243,7 +246,7 @@ def _landed(stage_id: str, text: str) -> bool:
         return grader.has_question(text) and 4 <= len(text.split()) <= 80
     if stage_id == "react_opener":
         return any(m in low for m in HOOK_MARKERS) and not grader.mentions_capability(text)
-    if stage_id in ("obj_paper", "obj_burned"):
+    if stage_id in ("obj_paper", "obj_status", "obj_burned"):
         return ack_q
     if stage_id == "react_handle_1":
         return grader.has_question(text)
@@ -264,28 +267,29 @@ def _landed(stage_id: str, text: str) -> bool:
 
 def run_call(args) -> None:
     rng = random.Random(args.seed)
-    script = persona.build_script(args.difficulty, rng)
+    profile = profiles.get_profile(args.profile)
+    script = persona.build_script(args.difficulty, rng, profile)
 
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     outdir = SESSIONS / session_id
     outdir.mkdir(parents=True, exist_ok=True)
 
     text_mode = args.text
-    voice = Voice(rate=persona.DIFFICULTY_RATE[args.difficulty], enabled=not text_mode)
+    voice = Voice(rate=profile.difficulty_rates[args.difficulty], enabled=not text_mode)
     recorder = None
     transcriber = None
     if not text_mode:
         recorder = Recorder(device=args.device, trailing_silence=args.silence)
-        transcriber = Transcriber(args.model, beam=1 if args.fast else 5)
+        transcriber = Transcriber(args.model, beam=1 if args.fast else 5,
+                                  initial_prompt=profile.whisper_primer)
 
     print()
     print("=" * 72)
-    print(f"  PROCORE SDR MOCK COLD CALL  --  {args.difficulty.upper()}")
+    print(f"  MOCK COLD CALL  --  {profile.display}  --  {args.difficulty.upper()}")
     print("=" * 72)
-    print(f"  You are Jason, SDR at Procore. You're cold calling {persona.PM_NAME},")
-    print(f"  Senior Project Manager at {persona.PM_COMPANY}.")
-    print("  He's influential, skeptical, burned by tech before, runs everything on paper.")
-    print("  Objective: book an intro call between him and a Procore AE.")
+    print(f"  You are Jason, BDR/SDR at {profile.company}. You're cold calling {profile.buyer_name},")
+    print(f"  {profile.buyer_title}.")
+    print(f"  Objective: {profile.objective}")
     print()
     print("  Rules you're being graded on: industry language, targeted questions,")
     print("  uncover the pain, book the follow-up with TWO specific times, handle")
@@ -323,7 +327,7 @@ def run_call(args) -> None:
         else:
             rec = recorder.record_turn()
             if rec.froze:
-                prompt = rng.choice(persona.FREEZE_PROMPTS)
+                prompt = rng.choice(profile.freeze_prompts)
                 print(f"MIKE (PM): {prompt}")
                 segments.append(voice.say(prompt))
                 segments.append(pause)
@@ -356,13 +360,14 @@ def run_call(args) -> None:
             meeting_booked = len(grader.find_time_offers(said)) >= 2
         print()
 
-    sign_off = persona.SIGN_OFF[meeting_booked]
+    sign_off = profile.sign_off[meeting_booked]
     print(f"MIKE (PM): {sign_off}")
     segments.append(voice.say(sign_off))
     print("\n  *click*\n")
 
     # ---- grade ----------------------------------------------------------
-    report = grader.grade(turns, args.difficulty, pain_revealed, meeting_booked)
+    report = grader.grade(turns, args.difficulty, pain_revealed, meeting_booked,
+                          profile=profile)
     console = grader.render_console(report)
     print(console)
 
@@ -434,14 +439,24 @@ def main() -> None:
                    help="paraphrase: wipe the ban list and start over")
     p.add_argument("--list-beats", action="store_true",
                    help="paraphrase: show the beats and exit")
+    p.add_argument("--profile", default=profiles.DEFAULT_PROFILE,
+                   help="company profile to use (see --list-profiles)")
+    p.add_argument("--list-profiles", action="store_true",
+                   help="list available profiles and exit")
     args = p.parse_args()
 
+    if args.list_profiles:
+        print("Available profiles:")
+        for name in profiles.list_profiles():
+            pr = profiles.get_profile(name)
+            print(f"  {name:14} {pr.buyer_name!s:14} {pr.display}")
+        return
     if args.list_devices:
         list_devices()
         return
     if args.list_beats:
         import paraphrase
-        paraphrase.list_beats()
+        paraphrase.list_beats(args.profile)
         return
     if args.paraphrase:
         import paraphrase

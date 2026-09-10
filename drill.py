@@ -9,6 +9,7 @@ from typing import Callable, List, Optional, Tuple
 
 import grader
 import persona
+import profiles
 
 ROOT = Path(__file__).resolve().parent
 SESSIONS = Path(os.environ.get("MOCKCALL_SESSIONS") or (ROOT / "sessions"))
@@ -25,9 +26,10 @@ def run_drill_session(
     now: Callable[[], float] = time.monotonic,
     cues: Optional[List[str]] = None,
     speak_cue: SpeakCue = lambda c: None,
+    profile=None,
 ) -> Tuple[List[grader.DrillShot], grader.DrillSummary]:
     rng = random.Random(seed)
-    lines = cues if cues is not None else persona.pain_drill_cues(reps, rng)
+    lines = cues if cues is not None else persona.pain_drill_cues(reps, rng, profile)
     start = now()
     budget = minutes * 60.0
     shots: List[grader.DrillShot] = []
@@ -59,6 +61,7 @@ def run_live(args) -> None:
     reps = args.reps
     minutes = args.minutes
     text_mode = args.text
+    profile = profiles.get_profile(getattr(args, "profile", None) or profiles.DEFAULT_PROFILE)
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S") + "-drill"
     outdir = SESSIONS / session_id
     outdir.mkdir(parents=True, exist_ok=True)
@@ -75,13 +78,14 @@ def run_live(args) -> None:
     segments: list = []
     pause = np.zeros(0, dtype=np.float32)
     if not text_mode:
-        voice = Voice(rate=persona.DIFFICULTY_RATE["normal"], enabled=True)
+        voice = Voice(rate=profile.difficulty_rates["normal"], enabled=True)
         recorder = Recorder(
             device=args.device,
             trailing_silence=min(args.silence, 1.5),
             max_seconds=8.0,
         )
-        transcriber = Transcriber(args.model, beam=1)
+        transcriber = Transcriber(args.model, beam=1,
+                                  initial_prompt=profile.whisper_primer)
         print("  Wear headphones so the mic doesn't pick up his voice.")
         recorder.calibrate()
         transcriber._load()
@@ -117,6 +121,7 @@ def run_live(args) -> None:
             text_mode=text_mode,
             capture=capture,
             speak_cue=speak_cue,
+            profile=profile,
         )
     except KeyboardInterrupt:
         print("\n  Drill abandoned.\n")
