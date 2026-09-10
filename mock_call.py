@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import weakref
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -77,7 +78,13 @@ class Voice:
         self.rate = rate
         self.enabled = enabled
         self._tmp = Path(tempfile.mkdtemp(prefix="mockcall_tts_"))
+        weakref.finalize(self, self._cleanup, self._tmp)
         self._n = 0
+
+    @staticmethod
+    def _cleanup(tmp):
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
 
     def say(self, text: str) -> np.ndarray:
         """Speak `text` aloud; return the audio at 16 kHz mono."""
