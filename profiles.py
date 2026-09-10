@@ -614,6 +614,120 @@ register(Profile(
 
 
 # ---------------------------------------------------------------------------
+# levitate profile (example of a live target employer)
+# ---------------------------------------------------------------------------
+
+# Levitate: a tool for relationship/referral businesses (independent insurance
+# agents, nonprofits, membership orgs) to stay in touch with their book of
+# business / supporters personally and proactively across the year, driving
+# referrals, renewals, and donations. Grounded in Jason's recorded live Levitate
+# calls (C:/Users/Jason/Documents/Interview/calls): low-pressure, consultative,
+# "just find time to show you how it works", peer reference ~7,000 orgs, then a
+# discovery probe. Buyer: an agency owner / executive director. Verify against
+# any current briefing before a live round.
+
+register(Profile(
+    name="levitate", display="Levitate (relationship / referral CRM)",
+    company="Levitate",
+    buyer_name="Casey", buyer_title="Owner of an independent insurance agency",
+    objective="Book a short demo (Zoom) with the Levitate AE, two specific times.",
+    difficulty_rates={"normal": 0, "hostile": 2, "apathetic": -1, "timepoor": 3},
+    pickup={
+        "normal": "Casey Morgan.",
+        "hostile": "Yeah? Who's this.",
+        "apathetic": "This is Casey.",
+        "timepoor": "Casey. Make it quick, I'm between client calls.",
+    },
+    react_opener={
+        "normal": ("Sure, go ahead. I've got a minute.",
+                   "Hang on, who is this? Are you selling me something?"),
+        "hostile": ("You've got one sentence, then I'm hanging up.",
+                    "I don't take cold calls. We run on referrals, not software."),
+        "apathetic": ("Alright, I guess. Go ahead.",
+                      "Look, our clients know us. I'm not really looking for anything."),
+        "timepoor": ("Alright, go, but I've got about a minute before a call.",
+                     "I'm in the middle of running the agency. What is this about?"),
+    },
+    objection_pools={
+        "status_quo": [
+            "We already send a newsletter and a holiday card. Our clients know us and referrals come in fine.",
+            "We've been in business on word of mouth alone for twenty years. Why change now?",
+            "Our book of business is in our heads and it's worked. I don't need software to stay in touch.",
+        ],
+        "burned": [
+            "Here's my problem though. We bought a CRM a few years back, paid for the training, and "
+            "nobody ever updated it. It just sat there. I'm not doing that again.",
+            "Every marketing tool we tried just fired off automated junk. It felt cold and impersonal, "
+            "and our clients noticed. Burned me pretty good.",
+            "I signed up for an outreach service once. It sent newsletters nobody read and I was stuck "
+            "paying for it. Heard that before.",
+        ],
+        "close": [
+            "Alright, look. Just send me an email and I'll take a look when I get a minute.",
+            "Do me a favour and just email me something. I don't have time for another call.",
+            "Send me an email. If it's worth it I'll get back to you.",
+        ],
+        "close_alt": [
+            "Before we go further, what does something like this run? Give me a number.",
+            "Hold on. How much is this going to cost me each month?",
+        ],
+    },
+    pain_reveal=[
+        "Honestly? Follow-up. Our best business comes from referrals, but between running the agency "
+        "nobody has time to stay in touch with the book, so people only hear from us when they need us.",
+        "It's the quiet ones we lose. The policyholders who don't renew just drift off, and we never "
+        "know why until the renewal is already gone.",
+        "Our whole value is the book of business, but it's scattered across inboxes, calendars, and "
+        "a few heads - there's no one place that keeps top of mind.",
+    ],
+    pain_drill_cues=[
+        "Clients only hear from us when they need something, so referral opportunities vanish. How much does that cost the agency?",
+        "The quiet policyholders just drift away and we don't know why until the renewal is gone. Who absorbs that?",
+        "Our whole value is the book of business but nobody has time to stay in touch with it. What's that worth?",
+        "We only reach out at renewal time, so people forget us the rest of the year. How does that hit your retention?",
+    ],
+    high_value_terms={
+        "book of business": r"\bbook of business\b",
+        "referral": r"\breferral(?:s)?\b",
+        "word of mouth": r"\bword of mouth\b",
+        "top of mind": r"\btop of mind\b",
+        "stay in touch / touchpoint": r"\bstay in touch\b|\btouchpoint(?:s)?\b|\bkeep in touch\b",
+        "follow-up": r"\bfollow[- ]?up\b",
+        "relationship": r"\brelationship(?:s)?\b|\bpersonal\b|\bproactive\b",
+        "nurture": r"\bnurtur\b",
+        "client / policyholder": r"\bclient(?:s)?\b|\bpolicy ?holder(?:s)?\b|\bcustomer(?:s)?\b|\binsured\b",
+        "renewal": r"\brenewal(?:s)?\b|\brenew(?:ed)?\b",
+        "book drift / lost touch": r"\bdrift\b|\bforget\b|\blost touch\b|\blose touch\b",
+        "retention": r"\bretention\b",
+    },
+    contextual_terms={
+        "agency / office": r"\bagency\b|\boffice\b|\bfirm\b|\bpractice\b",
+        "personnel": r"\bagent(?:s)?\b|\bstaff\b|\brep(?:s)?\b|\breceptionist\b",
+        "cadence / channel": r"\bnewsletter\b|\bholiday card\b|\bemail(?:s)?\b|\bredbook\b",
+        "time / calendar": r"\bcalendar\b|\binbox(?:es)?\b|\bweek\b|\bopenings\b",
+    },
+    whisper_primer=(
+        "A cold call from Levitate to an independent insurance agency owner about "
+        "staying in touch with their book of business. Terms used: book of business, "
+        "referral, word of mouth, top of mind, stay in touch, touchpoint, follow-up, "
+        "relationship, personal, proactive, nurture, clients, policyholders, renewal, "
+        "drift, retention, newsletter, holiday card, calendar, inbox."
+    ),
+    freeze_prompts=["Hello? You still there?", "You there?",
+                    "I've got about ten seconds here."],
+    sign_off={True: "Alright. Talk then.", False: "Yeah. Good luck."},
+    beats=_generic_beats(),
+    beat_order=list(GENERIC_BEAT_ORDER),
+    star_stories=list(GENERIC_STAR_STORIES),
+    hook_markers=["referral", "book of business", "top of mind", "stay in touch",
+                  "relationship", "client", "policy", "membership", "donor",
+                  "word of mouth", "follow up", "nurture"],
+    c1_priority=["book of business", "referral", "follow-up", "top of mind",
+                 "relationship", "client / policyholder"],
+))
+
+
+# ---------------------------------------------------------------------------
 # procore profile (example — construction). Beats are shared with the existing
 # paraphrase module so old behaviour is preserved.
 # ---------------------------------------------------------------------------

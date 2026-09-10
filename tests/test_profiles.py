@@ -52,6 +52,14 @@ class Shape(unittest.TestCase):
         self.assertIn("engagement", p.high_value_terms)
         self.assertIn("mentimeter", PF.list_profiles())
 
+    def test_levitate_is_well_formed(self):
+        p = PF.get_profile("levitate")
+        self.assertTrue(p.buyer_name)
+        self.assertTrue(p.objection_pools.get("status_quo"))
+        self.assertTrue(p.pain_drill_cues)
+        self.assertIn("book of business", p.high_value_terms)
+        self.assertIn("levitate", PF.list_profiles())
+
 
 if __name__ == "__main__":
     unittest.main()
