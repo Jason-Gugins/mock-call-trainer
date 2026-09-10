@@ -148,6 +148,7 @@ def run_live(args) -> None:
     )
     grader.append_drill_history(
         SESSIONS / "drill_history.csv", session_id, shots, summary.elapsed_s,
+        profile=profile.name,
     )
     print(f"  Report:  {outdir / 'report.md'}")
     print(f"  History: {SESSIONS / 'drill_history.csv'}")

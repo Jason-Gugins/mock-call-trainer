@@ -116,6 +116,15 @@ class ObjectionSummary(unittest.TestCase):
             self.assertEqual(rows[0]["verdict"], "FAST")
             self.assertFalse((folder / "history.csv").exists())
 
+    def test_history_has_profile_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            shots = [G.ObjectionShot(1, "cue", "It sounds like x", 1.0, False, True, "FAST")]
+            G.append_objection_history(folder / "objection_history.csv", "s1", shots, 5.0,
+                                       profile="boostsecurity")
+            rows = list(csv.DictReader((folder / "objection_history.csv").open(encoding="utf-8")))
+            self.assertEqual(rows[0]["profile"], "boostsecurity")
+
 
 if __name__ == "__main__":
     unittest.main()

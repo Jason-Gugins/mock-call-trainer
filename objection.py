@@ -175,7 +175,8 @@ def run_live(args) -> None:
         encoding="utf-8",
     )
     grader.append_objection_history(
-        SESSIONS / "objection_history.csv", session_id, shots, summary.elapsed_s)
+        SESSIONS / "objection_history.csv", session_id, shots, summary.elapsed_s,
+        profile=profile.name)
     print(f"  Report:  {outdir / 'report.md'}")
     print(f"  History: {SESSIONS / 'objection_history.csv'}")
     print()

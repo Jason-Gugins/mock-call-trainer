@@ -158,7 +158,8 @@ def run_live(args) -> None:
         encoding="utf-8",
     )
     grader.append_star_history(
-        SESSIONS / "star_history.csv", session_id, shots, summary.elapsed_s)
+        SESSIONS / "star_history.csv", session_id, shots, summary.elapsed_s,
+        profile=profile.name)
     print(f"  Report:  {outdir / 'report.md'}")
     print(f"  History: {SESSIONS / 'star_history.csv'}")
     print()

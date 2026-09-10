@@ -708,6 +708,7 @@ def append_history(csv_path: Path, session_id: str, rep: Report) -> None:
 
 DRILL_HISTORY_FIELDS = [
     "session", "shot", "verdict", "cost_question", "onset", "elapsed_s", "text", "cue",
+    "profile",
 ]
 
 
@@ -735,6 +736,7 @@ def render_drill_markdown(
 
 def append_drill_history(
     csv_path: Path, session_id: str, shots: List[DrillShot], elapsed_s: float,
+    profile: str = "procore",
 ) -> None:
     """One row per drill shot. Never write sessions/history.csv from here."""
     csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -754,6 +756,7 @@ def append_drill_history(
                 "elapsed_s": f"{elapsed_s:.1f}",
                 "text": s.text,
                 "cue": s.pm_line,
+                "profile": profile,
             })
 
 
@@ -860,7 +863,7 @@ def summarize_objection(shots: List[ObjectionShot], elapsed_s: float,
 
 
 OBJECTION_HISTORY_FIELDS = ["session", "shot", "verdict", "reflex", "onset",
-                            "elapsed_s", "text", "cue"]
+                            "elapsed_s", "text", "cue", "profile"]
 
 
 def render_objection_markdown(summary: ObjectionSummary, shots: List[ObjectionShot],
@@ -885,7 +888,8 @@ def render_objection_markdown(summary: ObjectionSummary, shots: List[ObjectionSh
 
 
 def append_objection_history(csv_path: Path, session_id: str,
-                             shots: List[ObjectionShot], elapsed_s: float) -> None:
+                             shots: List[ObjectionShot], elapsed_s: float,
+                             profile: str = "procore") -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     new = not csv_path.exists()
     with csv_path.open("a", newline="", encoding="utf-8") as f:
@@ -898,6 +902,7 @@ def append_objection_history(csv_path: Path, session_id: str,
                 "session": session_id, "shot": s.index, "verdict": s.verdict,
                 "reflex": "Y" if s.reflex else "N", "onset": onset,
                 "elapsed_s": f"{elapsed_s:.1f}", "text": s.text, "cue": s.cue,
+                "profile": profile,
             })
 
 
@@ -970,7 +975,7 @@ def summarize_star(shots: List[StarShot], elapsed_s: float,
 
 
 STAR_HISTORY_FIELDS = ["session", "shot", "topic", "ok", "missing", "duration",
-                       "elapsed_s", "text"]
+                       "elapsed_s", "text", "profile"]
 
 
 def render_star_markdown(summary: StarSummary, shots: List[StarShot],
@@ -996,7 +1001,7 @@ def render_star_markdown(summary: StarSummary, shots: List[StarShot],
 
 
 def append_star_history(csv_path: Path, session_id: str, shots: List[StarShot],
-                        elapsed_s: float) -> None:
+                        elapsed_s: float, profile: str = "procore") -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     new = not csv_path.exists()
     with csv_path.open("a", newline="", encoding="utf-8") as f:
@@ -1009,6 +1014,7 @@ def append_star_history(csv_path: Path, session_id: str, shots: List[StarShot],
                 "ok": "Y" if s.ok else "N", "missing": "; ".join(s.missing),
                 "duration": "" if s.duration is None else f"{s.duration:.0f}",
                 "elapsed_s": f"{elapsed_s:.1f}", "text": s.text,
+                "profile": profile,
             })
 
 
@@ -1087,7 +1093,7 @@ def summarize_narrative(shots: List[NarrativeShot], elapsed_s: float,
                             elapsed_s=elapsed_s, reps_requested=reps_requested)
 
 
-NARRATIVE_HISTORY_FIELDS = ["session", "shot", "kind", "ok", "missing", "text"]
+NARRATIVE_HISTORY_FIELDS = ["session", "shot", "kind", "ok", "missing", "text", "profile"]
 
 
 def render_narrative_markdown(summary: NarrativeSummary,
@@ -1114,7 +1120,8 @@ def render_narrative_markdown(summary: NarrativeSummary,
 
 
 def append_narrative_history(csv_path: Path, session_id: str,
-                             shots: List[NarrativeShot]) -> None:
+                             shots: List[NarrativeShot],
+                             profile: str = "procore") -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     new = not csv_path.exists()
     with csv_path.open("a", newline="", encoding="utf-8") as f:
@@ -1126,4 +1133,5 @@ def append_narrative_history(csv_path: Path, session_id: str,
                 "session": session_id, "shot": s.index, "kind": s.kind,
                 "ok": "Y" if s.ok else "N", "missing": "; ".join(s.missing),
                 "text": s.text,
+                "profile": profile,
             })

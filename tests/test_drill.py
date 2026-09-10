@@ -130,6 +130,15 @@ class SummarizeDrill(unittest.TestCase):
             self.assertEqual(rows[1]["cost_question"], "N")
             self.assertFalse((folder / "history.csv").exists())
 
+    def test_history_has_profile_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            shots = [G.DrillShot(1, "cue-a", "Who ate that?", 2.8, False, True, "FAST")]
+            G.append_drill_history(folder / "drill_history.csv", "sess1", shots, 12.0,
+                                   profile="boostsecurity")
+            rows = list(csv.DictReader((folder / "drill_history.csv").open(encoding="utf-8")))
+            self.assertEqual(rows[0]["profile"], "boostsecurity")
+
 
 class DrillLoop(unittest.TestCase):
     def test_stops_at_ten(self):

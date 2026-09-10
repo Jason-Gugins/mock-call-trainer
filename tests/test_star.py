@@ -83,6 +83,16 @@ class StarSummary(unittest.TestCase):
         self.assertTrue(hasattr(G, "render_star_markdown"))
         self.assertTrue(hasattr(G, "append_star_history"))
 
+    def test_history_has_profile_column(self):
+        import csv
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            shots = [G.StarShot(1, "drive-thru times", FULL_STAR, 70.0, [])]
+            G.append_star_history(folder / "star_history.csv", "s1", shots, 12.0,
+                                  profile="boostsecurity")
+            rows = list(csv.DictReader((folder / "star_history.csv").open(encoding="utf-8")))
+            self.assertEqual(rows[0]["profile"], "boostsecurity")
+
 
 if __name__ == "__main__":
     unittest.main()

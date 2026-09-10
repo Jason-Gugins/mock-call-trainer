@@ -59,6 +59,16 @@ class NarrativeHelpers(unittest.TestCase):
         self.assertTrue(hasattr(G, "render_narrative_markdown"))
         self.assertTrue(hasattr(G, "append_narrative_history"))
 
+    def test_history_has_profile_column(self):
+        import csv, tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            shots = [G.NarrativeShot(1, "gap", "the gap", "After 2018 I focused on self-study and launched outbound work.", [])]
+            G.append_narrative_history(folder / "narrative_history.csv", "s1", shots,
+                                       profile="boostsecurity")
+            rows = list(csv.DictReader((folder / "narrative_history.csv").open(encoding="utf-8")))
+            self.assertEqual(rows[0]["profile"], "boostsecurity")
+
 
 if __name__ == "__main__":
     unittest.main()

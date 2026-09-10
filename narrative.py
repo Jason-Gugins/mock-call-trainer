@@ -147,7 +147,8 @@ def run_live(args) -> None:
         encoding="utf-8",
     )
     grader.append_narrative_history(
-        SESSIONS / "narrative_history.csv", session_id, shots)
+        SESSIONS / "narrative_history.csv", session_id, shots,
+        profile=profile.name)
     print(f"  Report:  {outdir / 'report.md'}")
     print(f"  History: {SESSIONS / 'narrative_history.csv'}")
     print()
