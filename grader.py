@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import profiles
+
 STRONG, PASS, FAIL = "STRONG", "PASS", "FAIL"
 
 
@@ -26,42 +28,8 @@ STRONG, PASS, FAIL = "STRONG", "PASS", "FAIL"
 # Vocabulary and phrase banks
 # --------------------------------------------------------------------------
 
-# Terms that prove you speak construction. Keyed by canonical name so
-# "RFIs" and "RFI" don't double-count.
-HIGH_VALUE_TERMS: Dict[str, str] = {
-    "RFI": r"\brfi(?:s)?\b",
-    "submittal": r"\bsubmittal(?:s)?\b",
-    "change order": r"\bchange order(?:s)?\b|\bchange directive(?:s)?\b",
-    "drawing revision / superseded set": r"\bsupersede(?:d)?\b|\brevision(?:s)?\b|\b(?:current|old|latest|new) set\b|\bre-?issued\b",
-    "as-built": r"\bas-?built(?:s)?\b",
-    "daily log": r"\bdaily (?:log|logs|report|reports)\b",
-    "punch list": r"\bpunch ?list(?:s)?\b|\bdeficiency list\b",
-    "closeout": r"\bclose-?out\b",
-    "look-ahead schedule": r"\blook-?ahead\b",
-    "holdback": r"\bholdback(?:s)?\b",
-    "lien": r"\blien(?:s)?\b",
-    "T&M ticket": r"\bt ?& ?m\b|\btime and materials\b",
-    "schedule of values": r"\bschedule of values\b",
-    "progress billing / pay app": r"\bprogress billing\b|\bpay app(?:lication)?(?:s)?\b|\bprogress claim\b",
-    "scope gap": r"\bscope gap(?:s)?\b",
-    "rework": r"\brework\b|\btear ?out\b",
-    "safety observation": r"\bsafety observation(?:s)?\b",
-    "shop drawing": r"\bshop drawing(?:s)?\b",
-    "prime contract / subcontract": r"\bprime contract\b|\bsubcontract(?:s)?\b",
-}
-
-# Credit for sounding native, but these alone don't prove fluency.
-CONTEXTUAL_TERMS: Dict[str, str] = {
-    "superintendent": r"\bsuperintendent(?:s)?\b|\bsuper\b",
-    "foreman": r"\bforeman\b|\bforemen\b",
-    "crew": r"\bcrew(?:s)?\b",
-    "subs / trades": r"\bsub(?:s)?\b|\btrade(?:s)?\b|\bsubcontractor(?:s)?\b",
-    "jobsite": r"\bjob ?site(?:s)?\b|\bon site\b|\bjob walk\b",
-    "general contractor": r"\bgeneral contractor(?:s)?\b|\bgc(?:s)?\b",
-    "architect": r"\barchitect\b",
-    "drawings / specs": r"\bdrawing(?:s)?\b|\bspec(?:s)?\b|\bprint(?:s)?\b",
-    "schedule": r"\bschedule\b",
-}
+# High-value / contextual terms are per-profile (profiles/<name>.high_value_terms
+# and .contextual_terms); the rubric reads them from the profile passed to grade().
 
 # Generic SaaS filler. Banned outright in spoken lines by the build spec.
 BANNED_PHRASES: Dict[str, str] = {
@@ -428,16 +396,16 @@ def _level(strong: bool, ok: bool) -> str:
 
 
 def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
-          meeting_booked: bool) -> Report:
+          meeting_booked: bool, profile: Optional[profiles.Profile] = None) -> Report:
+    if profile is None:
+        profile = profiles.get_profile("procore")
     candidate_turns = [t for t in turns if t.text.strip() or t.froze]
     all_text = " ".join(t.text for t in turns)
 
     # ---- 1. Relevant industry language -------------------------------------
-    hv = find_matches(all_text, HIGH_VALUE_TERMS)
-    ctx = find_matches(all_text, CONTEXTUAL_TERMS)
-    missed = [t for t in ("RFI", "submittal", "change order", "closeout",
-                          "daily log", "drawing revision / superseded set")
-              if t not in hv]
+    hv = find_matches(all_text, profile.high_value_terms)
+    ctx = find_matches(all_text, profile.contextual_terms)
+    missed = [t for t in list(profile.high_value_terms)[:6] if t not in hv]
     c1 = CriterionResult(
         "Relevant industry language",
         _level(len(hv) >= 5, len(hv) >= 3),

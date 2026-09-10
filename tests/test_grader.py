@@ -140,5 +140,36 @@ class GradeWeak(unittest.TestCase):
         self.assertEqual(ol.verdict, "LEAK")
 
 
+class GradeGeneric(unittest.TestCase):
+    """c1 vocabulary is profile-driven; procore stays the default for back-compat."""
+
+    def setUp(self):
+        import profiles
+        self.gen = profiles.get_profile("generic_saas")
+        self.pro = profiles.get_profile("procore")
+
+    def test_default_profile_is_procore(self):
+        # No profile argument -> procore behaviour preserved.
+        rep = G.grade(build_good(), "normal", True, True)
+        self.assertEqual(rep.passed_count, 5)
+        self.assertTrue(rep.verdict.startswith("YES"))
+
+    def test_saas_terms_feed_generic_c1(self):
+        text = ("our pipeline is stuffed with dead leads, the crm is full of churn, "
+                "forecast is off, and none of our demos convert to revenue.")
+        gen = G.find_matches(text, self.gen.high_value_terms)
+        pro = G.find_matches(text, self.pro.high_value_terms)
+        self.assertGreaterEqual(len(gen), 4)   # pipeline, lead, crm, churn, forecast, demo...
+        self.assertEqual(len(pro), 0)          # construction terms absent
+
+    def test_construction_terms_feed_procore_c1(self):
+        text = ("RFIs and submittals sit in the truck, the change order got superseded, "
+                "closeout is a mess and the daily log is never current.")
+        pro = G.find_matches(text, self.pro.high_value_terms)
+        gen = G.find_matches(text, self.gen.high_value_terms)
+        self.assertGreaterEqual(len(pro), 5)
+        self.assertEqual(len(gen), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

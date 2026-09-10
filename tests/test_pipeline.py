@@ -17,6 +17,7 @@ import soundfile as sf
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import grader                                    # noqa: E402
+import profiles                                 # noqa: E402
 from mock_call import SR, Transcriber, _resample  # noqa: E402
 
 SPOKEN = (
@@ -57,7 +58,7 @@ def main() -> int:
     print(f"   heard: {text}")
 
     print("3. Grading the transcript...")
-    terms = grader.find_matches(text, grader.HIGH_VALUE_TERMS)
+    terms = grader.find_matches(text, profiles.get_profile("procore").high_value_terms)
     qs = grader.count_discovery_questions(text)
     ack = grader.is_acknowledged(text)
     banned = grader.find_matches(text, grader.BANNED_PHRASES)
