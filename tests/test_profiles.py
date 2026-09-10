@@ -44,6 +44,14 @@ class Shape(unittest.TestCase):
         self.assertIn("supply chain / SBOM", p.high_value_terms)
         self.assertIn("boostsecurity", PF.list_profiles())
 
+    def test_mentimeter_is_well_formed(self):
+        p = PF.get_profile("mentimeter")
+        self.assertTrue(p.buyer_name)
+        self.assertTrue(p.objection_pools.get("status_quo"))
+        self.assertTrue(p.pain_drill_cues)
+        self.assertIn("engagement", p.high_value_terms)
+        self.assertIn("mentimeter", PF.list_profiles())
+
 
 if __name__ == "__main__":
     unittest.main()

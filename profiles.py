@@ -503,6 +503,117 @@ register(Profile(
 
 
 # ---------------------------------------------------------------------------
+# mentimeter profile (example of a live target employer)
+# ---------------------------------------------------------------------------
+
+# Enterprise audience-engagement / interactive-presentations SaaS (used by a
+# majority of Fortune 500; L&D platform + leadership comms + meetings). Buyer:
+# a Learning & Development / People leader. Real pains: training impact is a
+# black box, all-hands are one-way, engagement is scattered so it can't be
+# measured. Authored 2026-09 from public materials; verify before a live round.
+
+register(Profile(
+    name="mentimeter", display="Mentimeter (audience engagement)",
+    company="Mentimeter",
+    buyer_name="Jordan", buyer_title="Head of Learning & Development at a mid-size company",
+    objective="Book a walkthrough with the Mentimeter AE, two specific times.",
+    difficulty_rates={"normal": 0, "hostile": 2, "apathetic": -1, "timepoor": 3},
+    pickup={
+        "normal": "Jordan.",
+        "hostile": "Yeah? Who's this.",
+        "apathetic": "This is Jordan.",
+        "timepoor": "Jordan. Make it quick, I'm between trainings.",
+    },
+    react_opener={
+        "normal": ("Alright. Thirty seconds, go ahead.",
+                   "Hang on, who is this? Are you selling me software?"),
+        "hostile": ("You've got one sentence, then I'm hanging up.",
+                    "I don't take cold calls. What do you want?"),
+        "apathetic": ("Sure, I guess. Go ahead.",
+                      "Look, we're fine with how we run training today."),
+        "timepoor": ("Fine, go, but I've got about a minute before a session.",
+                     "I'm about to run a training. What is this about?"),
+    },
+    objection_pools={
+        "status_quo": [
+            "Our people already use the free version when they need engagement. Why would we buy a central license?",
+            "We run training with our LMS and slide decks and it works fine. I'm not looking to change it.",
+            "Engagement on our team is fine. We're not in the market for another meeting tool.",
+        ],
+        "burned": [
+            "Here's my problem though. We bought an engagement platform four years back. It was dead "
+            "after onboarding - nobody standardized on it. I'm not doing that again.",
+            "We rolled out a meeting-tool platform before, everyone used it once, and it fell off. "
+            "Burned me pretty good.",
+            "Every L&D vendor says their tool will finally make training stick, and none of them have. "
+            "I've heard it before.",
+        ],
+        "close": [
+            "Alright, look. Just send me an email and I'll take a look when I get a minute.",
+            "Do me a favour and just email me something. I don't have time for another call.",
+            "Send me an email. If it's worth it I'll get back to you.",
+        ],
+        "close_alt": [
+            "Before we go further, what does something like this run? Give me a number.",
+            "Hold on. How much is this going to cost me?",
+        ],
+    },
+    pain_reveal=[
+        "Honestly? Training never sticks. We run the sessions, completion gets checked, but nobody "
+        "knows if it actually changed behavior - impact is a black box we can't report to leadership.",
+        "It's the all-hands and policy comms. It's one-way, people check out, and we can't tell if "
+        "anything actually landed - so there's always a compliance risk nobody can see.",
+        "Engagement is scattered. Every team runs its own thing, so we can't measure adoption or "
+        "show value when it's time to defend our budget.",
+    ],
+    pain_drill_cues=[
+        "Our trainings get completion checkboxes but we can't show behavior change or impact. What does that cost you?",
+        "All-hands is a one-way stream and we can't tell if anything landed. Where does that leave your leadership comms?",
+        "Every team runs engagement differently, so we can't measure adoption. Who owns that at report time?",
+        "Policy training gets the checkbox but not the understanding. How far does that gap take your compliance risk?",
+    ],
+    high_value_terms={
+        "engagement": r"\bengag(?:e|ed|ement)\b",
+        "training / L&D": r"\btraining(?:s)?\b|\bld\b|\blearning\b|\bdevelopment program\b",
+        "impact / behavior": r"\bimpact\b|\bbehavio(?:u)?r\b|\boutcome(?:s)?\b",
+        "adoption": r"\badopt\w*\b|\brollout\b",
+        "participation": r"\bparticipation\b|\binteractive\b|\bparticipation rate\b",
+        "poll / quiz / feedback": r"\bpoll(?:s)?\b|\bquiz(?:zes)?\b|\bfeedback\b|\bsurvey(?:s)?\b",
+        "all-hands / comms": r"\ball[- ]?hands\b|\bcommunication(?:s)?\b|\bcomms\b|\bbriefing\b",
+        "measurement / KPI": r"\bmeasure\w*\b|\bkpis?\b|\bmetrics\b|\binsights\b",
+        "onboarding / policy": r"\bonboard\w*\b|\bpolicy\b|\bcompliance\b|\bcertification\b",
+        "audience / presenter": r"\baudience\b|\bpresenter(?:s)?\b|\bmeeting leader\b|\bworkshop",
+        "scale / rollout": r"\bscal\w*\b|\bstandardiz\w*\b|\broll(?:-| )?out",
+    },
+    contextual_terms={
+        "teams / people": r"\bteam(?:s)?\b|\bpeople\b|\bemployee(?:s)?\b|\bfolks\b",
+        "meeting / session": r"\bmeeting(?:s)?\b|\bsession(?:s)?\b|\bworkshop(?:s)?\b",
+        "format tools": r"\bslide(?:s)?\b|\bdeck\b|\bweb(?:inar)?\b|\blms\b",
+        "leaders": r"\bleader(?:s)?\b|\bexec(?:s)?\b|\bmanagement\b|\bstakeholder(?:s)?\b",
+    },
+    whisper_primer=(
+        "A cold call with a learning and development leader at a company about "
+        "audience engagement for trainings, meetings, and all-hands. Terms used: "
+        "engagement, training, learning, L&D, impact, behavior, adoption, "
+        "participation, polls, quizzes, feedback, all-hands, communication, "
+        "measurement, KPI, insights, onboarding, policy, compliance, audience, "
+        "presenter, workshop, scale, standardized rollout."
+    ),
+    freeze_prompts=["Hello? You still there?", "You there?",
+                    "I've got about ten seconds here."],
+    sign_off={True: "Alright. Talk then.", False: "Yeah. Good luck."},
+    beats=_generic_beats(),
+    beat_order=list(GENERIC_BEAT_ORDER),
+    star_stories=list(GENERIC_STAR_STORIES),
+    hook_markers=["training", "learning", "engagement", "all hands", "all-hands",
+                  "meeting", "workshop", "onboarding", "policy", "compliance",
+                  "adoption", "impact", "feedback", "poll"],
+    c1_priority=["engagement", "training / L&D", "impact / behavior", "adoption",
+                 "measurement / KPI", "all-hands / comms"],
+))
+
+
+# ---------------------------------------------------------------------------
 # procore profile (example — construction). Beats are shared with the existing
 # paraphrase module so old behaviour is preserved.
 # ---------------------------------------------------------------------------
