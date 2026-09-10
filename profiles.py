@@ -617,14 +617,17 @@ register(Profile(
 # levitate profile (example of a live target employer)
 # ---------------------------------------------------------------------------
 
-# Levitate: a tool for relationship/referral businesses (independent insurance
-# agents, nonprofits, membership orgs) to stay in touch with their book of
-# business / supporters personally and proactively across the year, driving
-# referrals, renewals, and donations. Grounded in Jason's recorded live Levitate
-# calls (C:/Users/Jason/Documents/Interview/calls): low-pressure, consultative,
-# "just find time to show you how it works", peer reference ~7,000 orgs, then a
-# discovery probe. Buyer: an agency owner / executive director. Verify against
-# any current briefing before a live round.
+# Levitate: a personal-outreach tool for relationship/referral businesses
+# (independent insurance agents, builders/contractors, nonprofits, membership
+# orgs) to stay in touch with their book of business / past customers personally
+# and proactively across the year, driving word-of-mouth referrals and repeat
+# business. Explicit positioning from the live calls: "It's not lead gen, not
+# advertising, not spammy marketing - it's personal outreach." Grounded in
+# Jason's recorded live Levitate calls (C:/Users/Jason/Documents/Interview/calls):
+# low-pressure, consultative, "just find time to show you how it works", peer
+# reference (~7,000 orgs), then a discovery probe ("where does most of your
+# business come / what are you doing to keep in touch"). Buyer: an agency owner
+# / independent contractor. Verify against any current briefing before a live round.
 
 register(Profile(
     name="levitate", display="Levitate (relationship / referral CRM)",
@@ -693,8 +696,9 @@ register(Profile(
         "top of mind": r"\btop of mind\b",
         "stay in touch / touchpoint": r"\bstay in touch\b|\btouchpoint(?:s)?\b|\bkeep in touch\b",
         "follow-up": r"\bfollow[- ]?up\b",
-        "relationship": r"\brelationship(?:s)?\b|\bpersonal\b|\bproactive\b",
+        "relationship": r"\brelationship(?:s)?\b|\bpersonal\b|\bproactive\b|\bpersonal outreach\b",
         "nurture": r"\bnurtur\b",
+        "repeat business": r"\brepeat business\b|\bword of mouth\b",
         "client / policyholder": r"\bclient(?:s)?\b|\bpolicy ?holder(?:s)?\b|\bcustomer(?:s)?\b|\binsured\b",
         "renewal": r"\brenewal(?:s)?\b|\brenew(?:ed)?\b",
         "book drift / lost touch": r"\bdrift\b|\bforget\b|\blost touch\b|\blose touch\b",
@@ -721,7 +725,8 @@ register(Profile(
     star_stories=list(GENERIC_STAR_STORIES),
     hook_markers=["referral", "book of business", "top of mind", "stay in touch",
                   "relationship", "client", "policy", "membership", "donor",
-                  "word of mouth", "follow up", "nurture"],
+                  "word of mouth", "follow up", "nurture", "repeat business",
+                  "personal outreach", "lead gen", "architect", "builder"],
     c1_priority=["book of business", "referral", "follow-up", "top of mind",
                  "relationship", "client / policyholder"],
 ))
