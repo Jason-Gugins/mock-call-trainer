@@ -271,7 +271,7 @@ def run_call(args) -> None:
     script = persona.build_script(args.difficulty, rng, profile)
 
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    outdir = SESSIONS / session_id
+    outdir = SESSIONS / profile.name / session_id
     outdir.mkdir(parents=True, exist_ok=True)
 
     text_mode = args.text

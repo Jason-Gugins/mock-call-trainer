@@ -63,7 +63,7 @@ def run_live(args) -> None:
     text_mode = args.text
     profile = profiles.get_profile(getattr(args, "profile", None) or profiles.DEFAULT_PROFILE)
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S") + "-drill"
-    outdir = SESSIONS / session_id
+    outdir = SESSIONS / profile.name / session_id
     outdir.mkdir(parents=True, exist_ok=True)
 
     print()

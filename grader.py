@@ -373,6 +373,7 @@ HISTORY_FIELDS = [
     "c4_book_followup", "c5_handle_objections",
     "opener_latency", "objection_pause", "ack_rate", "pitch_before_pain",
     "filler_rate", "longest_turn", "banned_words", "freezes", "talk_time",
+    "profile",
 ]
 
 
@@ -385,6 +386,7 @@ class Report:
     coach_first: List[str]
     turns: List[Turn]
     difficulty: str
+    profile: str = ""
 
     @property
     def score_line(self) -> str:
@@ -586,7 +588,8 @@ def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
     if not coach:
         coach.append("Nothing failed. Push for STRONG on the criteria still at PASS.")
 
-    return Report(criteria, leaks, verdict, passed, coach[:3], turns, difficulty)
+    return Report(criteria, leaks, verdict, passed, coach[:3], turns, difficulty,
+                  profile=profile.name)
 
 
 # --------------------------------------------------------------------------
@@ -596,10 +599,10 @@ def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
 def render_console(rep: Report) -> str:
     L = []
     L.append("=" * 72)
-    L.append(f"  SCORECARD  --  difficulty: {rep.difficulty}")
+    L.append(f"  SCORECARD  --  profile: {rep.profile}  difficulty: {rep.difficulty}")
     L.append("=" * 72)
     L.append("")
-    L.append("PROCORE'S FIVE PUBLISHED CRITERIA")
+    L.append("THE FIVE CRITERIA")
     for c in rep.criteria:
         L.append(f"  [{c.level:<6}] {c.name}")
         L.append(f"           {c.detail}")
@@ -624,13 +627,13 @@ def render_console(rep: Report) -> str:
 
 
 def render_markdown(rep: Report, session_id: str, wav_name: str) -> str:
-    L = [f"# Mock Cold Call - Session {session_id}", ""]
+    L = [f"# Mock Cold Call [{rep.profile}] - Session {session_id}", ""]
     L.append(f"- **Difficulty:** {rep.difficulty}")
     L.append(f"- **Result:** {rep.score_line}")
     L.append(f"- **Verdict:** {rep.verdict}")
     L.append(f"- **Audio:** `{wav_name}`")
     L.append("")
-    L.append("## Procore's five published criteria")
+    L.append("## The five criteria")
     L.append("")
     L.append("| Criterion | Level | Detail |")
     L.append("| --- | --- | --- |")
@@ -686,6 +689,7 @@ def append_history(csv_path: Path, session_id: str, rep: Report) -> None:
         "difficulty": rep.difficulty,
         "criteria_passed": rep.passed_count,
         "verdict": rep.verdict.split("--")[0].strip(),
+        "profile": rep.profile,
     })
     for c in rep.criteria:
         if c.key in row:

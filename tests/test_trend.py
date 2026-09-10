@@ -61,6 +61,13 @@ class Tabulate(unittest.TestCase):
         self.assertNotIn("2 in", out)
         self.assertNotIn("7 in", out)
 
+    def test_profile_suffix_in_session_column(self):
+        rows = [{"session": "s1", "profile": "generic_saas", "criteria_passed": "5"},
+                {"session": "s2", "profile": "", "criteria_passed": "4"}]
+        out = trend.tabulate(rows)
+        self.assertIn("s1/generic_saas", out)
+        self.assertIn("s2", out)  # no profile -> plain session id
+
 
 if __name__ == "__main__":
     unittest.main()

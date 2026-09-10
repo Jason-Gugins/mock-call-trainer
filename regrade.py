@@ -93,7 +93,11 @@ def main() -> int:
     # Exclude *-drill dirs: the live app keeps drill history separate
     # (drill_history.csv) and never touches history.csv, so folding a drill
     # folder in here would write a junk 0/5 row and corrupt the funnel trend.
-    reports = [p for p in sorted(SESSIONS.glob("*/report.md"))
+    # Sessions now live at sessions/<profile>/<ts>/, but keep supporting the
+    # older sessions/<ts>/ layout for pre-profile recordings.
+    candidates = sorted(SESSIONS.glob("*/report.md")) + \
+                 sorted(SESSIONS.glob("*/*/report.md"))
+    reports = [p for p in candidates
                if (p.parent / "session.wav").exists()
                and not p.parent.name.endswith("-drill")]
     if not reports:

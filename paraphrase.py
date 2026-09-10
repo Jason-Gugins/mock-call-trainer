@@ -543,7 +543,7 @@ def run_live(args) -> None:
         seeded = bank.seed_from_sessions()
 
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S") + "-para"
-    outdir = SESSIONS / session_id
+    outdir = SESSIONS / profile.name / session_id
     outdir.mkdir(parents=True, exist_ok=True)
 
     text_mode = args.text

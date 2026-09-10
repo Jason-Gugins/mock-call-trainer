@@ -75,6 +75,25 @@ class CliRegrade(unittest.TestCase):
             self.assertIn("2026-08-20_111111", content)
             self.assertNotIn("2026-08-20_222222-drill", content)
 
+    def test_reads_sessions_nested_under_profile_dir(self):
+        # New layout: sessions/<profile>/<ts>/. regrade must find those too.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prof_dir = root / "generic_saas"
+            prof_dir.mkdir(parents=True)
+            d = prof_dir / "2026-08-21_111111"
+            d.mkdir()
+            (d / "session.wav").write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+            (d / "report.md").write_text(
+                "# Mock Cold Call [generic_saas] - Session 2026-08-21_111111\n\n"
+                "- **Difficulty:** normal\n"
+                "- **Result:** 4/5 criteria at PASS or better\n"
+                "- **Verdict:** YES -- reads like a real call.\n"
+                "- **Audio:** `session.wav`\n", encoding="utf-8")
+            proc = self._run([], root)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("2026-08-21_111111", proc.stdout)
+
     def test_real_sessions_dir_untouched(self):
         # Snapshot FULL content digests of the real sessions dir, not just file
         # names: a --write that rewrites history.csv or report.md in place would

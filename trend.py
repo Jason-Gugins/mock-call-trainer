@@ -61,10 +61,15 @@ def _fmt(v):
 
 
 def tabulate(rows) -> str:
-    lines = ["session" + " " * 17 + " ".join(f"{label:>6}" for _, label in HEADLINE)]
+    header = "session" + " " * (32 - len("session")) + \
+             " ".join(f"{label:>6}" for _, label in HEADLINE)
+    lines = [header]
     for r in rows:
+        sess = r.get("session", "?")
+        prof = r.get("profile", "")
+        label = f"{sess}/{prof}" if prof else sess
         args = [_fmt(_parse(k, r.get(k, ""))) for k, _ in HEADLINE]
-        lines.append(r.get("session", "?")[:22].ljust(24) + " ".join(f"{a:>6}" for a in args))
+        lines.append(label[:32].ljust(32) + " ".join(f"{a:>6}" for a in args))
     return "\n".join(lines)
 
 
