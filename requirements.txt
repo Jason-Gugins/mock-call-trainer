@@ -1,0 +1,5 @@
+numpy~=2.5
+sounddevice~=0.5
+soundfile~=0.14
+faster-whisper~=1.2
+ctranslate2~=4.8
