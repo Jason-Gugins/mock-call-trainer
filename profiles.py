@@ -10,6 +10,7 @@ fields are plain strings matched via re.search against normalized lowercase.
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -44,6 +45,31 @@ class Beat:
     min_time_offers: int = 0
     forbid_capability: bool = False
     seed_turn: Optional[int] = None
+
+    def check_idea(self, text: str) -> Tuple[bool, List[str]]:
+        """Did the meaning survive? Returns (ok, list of what's missing)."""
+        import grader  # local import avoids a profiles<->grader cycle
+
+        missing: List[str] = []
+        hit = [name for name, pat in self.concepts.items()
+               if re.search(pat, (text or "").lower())]
+        if len(hit) < self.min_concepts:
+            need = self.min_concepts - len(hit)
+            absent = [n for n in self.concepts if n not in hit]
+            missing.append(f"need {need} more of: {', '.join(absent)}")
+        if self.require_question and not grader.has_question(text):
+            missing.append("no question")
+        if self.require_ack and not grader.is_acknowledged(text):
+            missing.append("did not acknowledge first")
+        if self.require_implication and not grader.has_implication_question(text):
+            missing.append("no cost/consequence question")
+        if self.min_time_offers:
+            offers = grader.find_time_offers(text)
+            if len(offers) < self.min_time_offers:
+                missing.append(f"{len(offers)} specific times, need {self.min_time_offers}")
+        if self.forbid_capability and grader.mentions_capability(text):
+            missing.append("pitched a capability")
+        return (not missing), missing
 
 
 @dataclass
@@ -470,14 +496,7 @@ _procore = Profile(
 register(_procore)
 
 
-def _load_procore_beats() -> Tuple[Dict[str, Beat], List[str]]:
-    """Procore's paraphrase beats live in paraphrase.py; load them lazily so the
-    profile keeps one source of truth and old behaviour is byte-identical."""
-    from paraphrase import BEATS, BEAT_ORDER
-    return BEATS, BEAT_ORDER
+# NOTE: procore's paraphrase beats (construction) live in paraphrase.py and are
+# attached there at import time so profiles can import standalone without a
+# circular dependency.
 
-
-try:
-    _procore.beats, _procore.beat_order = _load_procore_beats()
-except ImportError:
-    pass  # paraphrase not yet migrated; profiles import alone must not crash

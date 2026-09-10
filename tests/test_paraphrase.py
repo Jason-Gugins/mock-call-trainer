@@ -213,6 +213,20 @@ md = P.render_markdown(summary, shots, "test", "session.wav")
 check("markdown mentions the reused span", "Reused span" in md, True)
 check("markdown has a row per shot", md.count("\n| 1 |"), 1)
 
+# --------------------------------------------------------------------------
+# 7. Generic profile beats work too (profiles are swappable)
+# --------------------------------------------------------------------------
+
+from profiles import get_profile  # noqa: E402
+_gen = get_profile("generic_saas")
+gen_beats = _gen.beats
+check("generic opener memorised passes alone",
+      P.score_shot(gen_beats["opener"], MEMORISED_OPENER, [])[0], FRESH)
+check("generic opener memorised is RECITED when banked",
+      P.score_shot(gen_beats["opener"], MEMORISED_OPENER, [MEMORISED_OPENER])[0], RECITED)
+check("generic opener genuine rewording is FRESH",
+      P.score_shot(gen_beats["opener"], FRESH_OPENERS[0], [MEMORISED_OPENER])[0], FRESH)
+
 
 # --------------------------------------------------------------------------
 

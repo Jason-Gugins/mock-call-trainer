@@ -227,7 +227,8 @@ class CliDrill(unittest.TestCase):
             self.assertIn("FRESH", proc.stdout)
             self.assertIn("RECITED", proc.stdout)
             self.assertIn("1/2 fresh", proc.stdout)
-            self.assertTrue((Path(tmp) / "paraphrase_bank.json").exists())
+            # bank is keyed by the active profile (generic_saas is the default)
+            self.assertTrue((Path(tmp) / "paraphrase_bank_generic_saas.json").exists())
 
     def test_real_sessions_dir_untouched_by_tests(self):
         """Guard against this whole class regressing and eating live data again."""

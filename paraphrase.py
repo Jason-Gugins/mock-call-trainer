@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import grader
+from profiles import PROFILE, Beat, DEFAULT_PROFILE, get_profile
 
 ROOT = Path(__file__).resolve().parent
 # Overridable so the CLI tests can't append to the real sessions/ or the bank.
@@ -100,46 +101,8 @@ def jaccard(a: Sequence[str], b: Sequence[str]) -> float:
 
 # --------------------------------------------------------------------------
 # Beats -- what idea has to survive the rewording
+# (Beat is defined in profiles.py and imported above.)
 # --------------------------------------------------------------------------
-
-@dataclass
-class Beat:
-    id: str
-    label: str
-    cue: str                       # what Mike says first (empty = drill starts cold)
-    instruction: str
-    concepts: Dict[str, str] = field(default_factory=dict)
-    min_concepts: int = 2
-    require_question: bool = False
-    require_ack: bool = False
-    require_implication: bool = False
-    min_time_offers: int = 0
-    forbid_capability: bool = False
-    seed_turn: Optional[int] = None    # which YOU turn in a full call feeds the bank
-
-    def check_idea(self, text: str) -> Tuple[bool, List[str]]:
-        """Did the meaning survive? Returns (ok, list of what's missing)."""
-        missing: List[str] = []
-        hit = [name for name, pat in self.concepts.items()
-               if re.search(pat, (text or "").lower())]
-        if len(hit) < self.min_concepts:
-            need = self.min_concepts - len(hit)
-            absent = [n for n in self.concepts if n not in hit]
-            missing.append(f"need {need} more of: {', '.join(absent)}")
-        if self.require_question and not grader.has_question(text):
-            missing.append("no question")
-        if self.require_ack and not grader.is_acknowledged(text):
-            missing.append("did not acknowledge first")
-        if self.require_implication and not grader.has_implication_question(text):
-            missing.append("no cost/consequence question")
-        if self.min_time_offers:
-            offers = grader.find_time_offers(text)
-            if len(offers) < self.min_time_offers:
-                missing.append(f"{len(offers)} specific times, need {self.min_time_offers}")
-        if self.forbid_capability and grader.mentions_capability(text):
-            missing.append("pitched a capability")
-        return (not missing), missing
-
 
 BEATS: Dict[str, Beat] = {
     "opener": Beat(
@@ -265,6 +228,20 @@ BEATS: Dict[str, Beat] = {
 
 BEAT_ORDER = ["opener", "hook", "obj_paper", "discovery", "cost", "obj_burned", "close"]
 
+# Procore's construction beats are the module default; expose them through the
+# procore profile so profile-driven lookup sees them. generic_saas and other
+# profiles carry their own beats from profiles.py.
+if "procore" in PROFILE:
+    get_profile("procore").beats = BEATS
+    get_profile("procore").beat_order = BEAT_ORDER
+
+
+def beats_for(profile=None):
+    """(beats, beat_order) for a profile, falling back to the procore default."""
+    if profile is not None and getattr(profile, "beats", None):
+        return profile.beats, profile.beat_order or BEAT_ORDER
+    return BEATS, BEAT_ORDER
+
 
 # --------------------------------------------------------------------------
 # The bank of things you've already said
@@ -273,10 +250,13 @@ BEAT_ORDER = ["opener", "hook", "obj_paper", "discovery", "cost", "obj_burned", 
 class Bank:
     """Everything already said per beat, persisted so novelty accrues across runs."""
 
-    def __init__(self, path: Path = BANK_PATH):
-        self.path = path
+    def __init__(self, path: Optional[Path] = None, profile=None):
+        if path is None:
+            path = BANK_PATH if profile is None else \
+                SESSIONS / f"paraphrase_bank_{profile.name}.json"
+        self.path = Path(path)
         self.data: Dict[str, List[str]] = {}
-        if path.exists():
+        if self.path.exists():
             try:
                 self.data = json.loads(path.read_text(encoding="utf-8"))
             except (ValueError, OSError):
@@ -423,14 +403,16 @@ def run_session(
     now: Callable[[], float] = time.monotonic,
     max_run: int = MAX_SHARED_RUN,
     jaccard_limit: float = JACCARD_LIMIT,
+    beats: Optional[Dict[str, Beat]] = None,
 ) -> Tuple[List[Shot], Summary]:
+    beats = beats or BEATS
     start = now()
     budget = minutes * 60.0
     shots: List[Shot] = []
     for i in range(1, reps + 1):
         if i > 1 and (now() - start) >= budget:
             break
-        beat = BEATS[beat_ids[(i - 1) % len(beat_ids)]]
+        beat = beats[beat_ids[(i - 1) % len(beat_ids)]]
         speak_cue(beat, i)
         text, onset, froze = capture()
         verdict, missing, collision = score_shot(
@@ -518,24 +500,26 @@ def append_history(csv_path: Path, session_id: str, shots: List[Shot]) -> None:
 # Live entry point
 # --------------------------------------------------------------------------
 
-def resolve_beats(spec: str) -> List[str]:
+def resolve_beats(spec: str, profile=None) -> List[str]:
+    beats, order = beats_for(profile)
     if spec == "all":
-        return list(BEAT_ORDER)
+        return list(order)
     ids = [b.strip() for b in spec.split(",") if b.strip()]
-    unknown = [b for b in ids if b not in BEATS]
+    unknown = [b for b in ids if b not in beats]
     if unknown:
         raise SystemExit(f"unknown beat(s): {', '.join(unknown)}\n"
-                         f"available: {', '.join(BEAT_ORDER)}, all")
+                         f"available: {', '.join(order)}, all")
     return ids
 
 
-def list_beats() -> None:
+def list_beats(profile=None) -> None:
+    beats, order = beats_for(profile)
     print("Paraphrase beats:\n")
-    for bid in BEAT_ORDER:
-        b = BEATS[bid]
+    for bid in order:
+        b = beats[bid]
         print(f"  {bid:11} {b.label}")
         print(f"              {b.instruction}")
-    print(f"\n  all         cycle through all {len(BEAT_ORDER)}")
+    print(f"\n  all         cycle through all {len(order)}")
 
 
 def run_live(args) -> None:
@@ -546,8 +530,11 @@ def run_live(args) -> None:
 
     from mock_call import SR, Recorder, Transcriber, Voice
 
-    beat_ids = resolve_beats(args.beat)
-    bank = Bank()
+    name = getattr(args, "profile", None) or DEFAULT_PROFILE
+    profile = get_profile(name)
+
+    beat_ids = resolve_beats(args.beat, profile)
+    bank = Bank(profile=profile)
     if args.reset_bank:
         bank.data = {}
         print("  Bank cleared.")
@@ -633,6 +620,7 @@ def run_live(args) -> None:
             beat_ids=beat_ids, reps=args.reps, minutes=args.minutes,
             capture=capture, bank=bank, speak_cue=speak_cue, report=report,
             max_run=args.max_run, jaccard_limit=args.jaccard,
+            beats=profile.beats or None,
         )
     except KeyboardInterrupt:
         print("\n  Drill abandoned.\n")
@@ -656,7 +644,7 @@ def run_live(args) -> None:
         render_markdown(summary, shots, session_id, wav_name if not text_mode else ""),
         encoding="utf-8",
     )
-    append_history(SESSIONS / "paraphrase_history.csv", session_id, shots)
+    append_history(SESSIONS / f"paraphrase_history_{profile.name}.csv", session_id, shots)
     print(f"  Report:  {outdir / 'report.md'}")
     print(f"  History: {SESSIONS / 'paraphrase_history.csv'}")
     print(f"  Bank:    {bank.path}")
