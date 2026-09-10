@@ -981,3 +981,118 @@ def append_star_history(csv_path: Path, session_id: str, shots: List[StarShot],
                 "duration": "" if s.duration is None else f"{s.duration:.0f}",
                 "elapsed_s": f"{elapsed_s:.1f}", "text": s.text,
             })
+
+
+# --------------------------------------------------------------------------
+# Career narrative + gap-answer drill (--narrative)
+# --------------------------------------------------------------------------
+
+NARRATIVE_HEDGE = (r"\bi (think|guess|suppose|maybe|sort of|kind of|not sure"
+                   r"|don'?t know|feel like)\b")
+
+# kind -> (must-have evidence regex, min_words, max_words). Graded by discrete
+# required elements, not by judging the whole narrative.
+NARRATIVE_SPEC = {
+    "why_sales": (r"\b(metrics|numbers|data|quant|measure|outbound|project|reps?|"
+                  r"pipeline|analyt|results)\b", 1, 70),
+    "why_company": (r"\b(company|product|mission|customers?|market|industry|"
+                    r"opportunity|about (them|this|you))\b", 1, 70),
+    "gap": (r"\b(since|then|after|today|now)\b.{0,60}\b(learn|built|focused|"
+            r"self-?taught|studied|launched|outbound|worked|trained|pivoted)\b",
+            1, 60),
+}
+
+NARRATIVE_LABELS = {
+    "why_sales": "Why sales? Why now?",
+    "why_company": "Why this company?",
+    "gap": "Walk me through the 2018-2023 gap.",
+}
+
+
+def score_narrative_shot(kind: str, text: str) -> List[str]:
+    """Returns missing elements. Empty list == airtight one-line answer."""
+    low = _norm(text)
+    must, minw, maxw = NARRATIVE_SPEC[kind]
+    n = len(low.split())
+    missing: List[str] = []
+    if not (minw <= n <= maxw):
+        missing.append("wrong length (aim for one confident sentence)")
+    if not re.search(must, low):
+        missing.append(f"missing {kind} evidence")
+    if re.search(NARRATIVE_HEDGE, low):
+        missing.append("hedging language")
+    return missing
+
+
+@dataclass
+class NarrativeShot:
+    index: int
+    kind: str
+    label: str
+    text: str
+    missing: List[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.missing
+
+
+@dataclass
+class NarrativeSummary:
+    n: int
+    passed: int
+    elapsed_s: float
+    reps_requested: int
+
+    @property
+    def line(self) -> str:
+        return (f"NARRATIVE  {self.passed}/{self.n} airtight  "
+                f"(evidence + concision + no hedging)")
+
+
+def summarize_narrative(shots: List[NarrativeShot], elapsed_s: float,
+                        reps_requested: int) -> NarrativeSummary:
+    return NarrativeSummary(n=len(shots), passed=sum(1 for s in shots if s.ok),
+                            elapsed_s=elapsed_s, reps_requested=reps_requested)
+
+
+NARRATIVE_HISTORY_FIELDS = ["session", "shot", "kind", "ok", "missing", "text"]
+
+
+def render_narrative_markdown(summary: NarrativeSummary,
+                              shots: List[NarrativeShot], session_id: str,
+                              wav_name: str) -> str:
+    L = [f"# Career narrative drill - {session_id}", ""]
+    L.append(f"- **Result:** {summary.line}")
+    L.append(f"- **Elapsed:** {summary.elapsed_s:.0f}s")
+    if wav_name:
+        L.append(f"- **Audio:** `{wav_name}`")
+    L.append("")
+    L.append("| Answer | Prompt | Airtight | Missing |")
+    L.append("| --- | --- | --- | --- |")
+    for s in shots:
+        L.append(f"| {s.index} | {s.label} | {'YES' if s.ok else 'NO'} | "
+                 f"{'; '.join(s.missing) or '—'} |")
+    L.append("")
+    for s in shots:
+        L.append(f"**Answer {s.index} ({s.label})**")
+        L.append("")
+        L.append(f"> {s.text or '[silence]'}")
+        L.append("")
+    return "\n".join(L)
+
+
+def append_narrative_history(csv_path: Path, session_id: str,
+                             shots: List[NarrativeShot]) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    new = not csv_path.exists()
+    with csv_path.open("a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=NARRATIVE_HISTORY_FIELDS, extrasaction="ignore")
+        if new:
+            w.writeheader()
+        for s in shots:
+            w.writerow({
+                "session": session_id, "shot": s.index, "kind": s.kind,
+                "ok": "Y" if s.ok else "N", "missing": "; ".join(s.missing),
+                "text": s.text,
+            })
