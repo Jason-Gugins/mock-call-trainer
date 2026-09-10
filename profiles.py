@@ -391,6 +391,118 @@ register(Profile(
 
 
 # ---------------------------------------------------------------------------
+# boostsecurity profile (example of a real target employer)
+# ---------------------------------------------------------------------------
+
+# AI-native ASPM / DevSecOps platform (Montreal): secure the CI/CD software
+# supply chain - developer endpoint, dependencies/supply chain, and code.
+# Buyer: an AppSec / security engineering lead. Real objections: scanner
+# fatigue (noise/false positives), developer adoption, supply-chain risk.
+# Authored 2026-09 with the company's own language; verify pains/vocab against
+# the current homepage and any briefing before a live round.
+
+register(Profile(
+    name="boostsecurity", display="BoostSecurity (AI-native ASPM)",
+    company="BoostSecurity",
+    buyer_name="Priya", buyer_title="AppSec Team Lead at a fast-growing SaaS company",
+    objective="Book a technical walkthrough with the BoostSecurity AE, two specific times.",
+    difficulty_rates={"normal": 0, "hostile": 2, "apathetic": -1, "timepoor": 3},
+    pickup={
+        "normal": "Priya Sharma.",
+        "hostile": "Yeah? Who's this.",
+        "apathetic": "This is Priya.",
+        "timepoor": "Priya. Make it quick, I'm in the middle of a pentest review.",
+    },
+    react_opener={
+        "normal": ("Alright. Thirty seconds, go ahead.",
+                   "Hang on, who is this? Are you selling me another security tool?"),
+        "hostile": ("You've got one sentence, then I'm hanging up.",
+                    "I don't take cold calls about security. What do you want?"),
+        "apathetic": ("Sure, I guess. Go ahead.",
+                      "Look, I'm not really in the market for anything."),
+        "timepoor": ("Fine, go, but I've got about a minute before a report lands.",
+                     "I'm mid-incident. What is this about?"),
+    },
+    objection_pools={
+        "status_quo": [
+            "We already run a scanner and a pentest program. Our security is covered.",
+            "Developers have enough alerts already. I'm not adding another tool they'll ignore.",
+            "We've managed our risk this long without a platform. Why change now?",
+        ],
+        "burned": [
+            "Here's my problem though. We bought a security platform four years back. The "
+            "devs never looked at a single finding - it just added noise. I'm not doing that again.",
+            "We already tried an ASPM tool. It was a dashboard nobody opened, and we were "
+            "still paying for it. Burned me pretty good.",
+            "Every security vendor says their tool won't slow shipping, and every one has. "
+            "I've been burned enough.",
+        ],
+        "close": [
+            "Alright, look. Just send me an email and I'll take a look when I get a minute.",
+            "Do me a favour and just email me something. I don't have time for another call.",
+            "Send me an email. If it's worth it I'll get back to you.",
+        ],
+        "close_alt": [
+            "Before we go further, what does something like this run? Give me a number.",
+            "Hold on. How much is this going to cost me?",
+        ],
+    },
+    pain_reveal=[
+        "Honestly? Noise. We run three scanners and most of the findings are false positives, "
+        "so nobody trusts the queue and real risk slips through to production.",
+        "It's adoption. Security keeps buying tools and developers keep ignoring them, and I'm "
+        "the one explaining why our posture looks bad at audit.",
+        "The supply chain. A malicious dependency or a compromised build gets in before we even "
+        "know it, and one bad package can take the company down.",
+    ],
+    pain_drill_cues=[
+        "Most of our scanner findings are false positives, so developers ignore the queue and real risk slips through. What does that cost you?",
+        "Security bought two platforms last year and the devs never opened them. Where does that leave your AppSec backlog?",
+        "A malicious dependency can get into a build before anyone notices. Who absorbs that if it ships?",
+        "We have thousands of findings and no way to tell what's actually reachable. How do you prioritize?",
+    ],
+    high_value_terms={
+        "vulnerability / CVE": r"\b(cve|vulnerabilit(?:y|ies))\b",
+        "SAST / DAST": r"\bsast\b|\bdast\b|\bscanner\b|\bscan(?:ning)?\b",
+        "reachability": r"\breachab\w*\b",
+        "ASPM / posture": r"\baspm\b|\bposture\b",
+        "supply chain / SBOM": r"\bsupply chain\b|\bsbom\b",
+        "CI/CD / pipeline": r"\bci/?cd\b|\bpipeline\b|\bbuild\b",
+        "remediation / fix": r"\bremediat\w*\b|\bauto-?fix\b|\bfix\b",
+        "alert / finding / noise": r"\balert(?:s)?\b|\bfinding(?:s)?\b|\bnoise\b",
+        "exposure / misconfig": r"\bexpos(?:e|ed|ure)\b|\bmisconfigur\w*\b",
+        "dependency": r"\bdependenc(?:y|ies)\b|\bpackage(?:s)?\b",
+        "threat / exploit": r"\bthreat(?:s)?\b|\bexploit\b|\bliving off the pipeline\b",
+        "DevSecOps / AppSec": r"\bdevsecops\b|\bappsec\b|\bapplication security\b",
+    },
+    contextual_terms={
+        "developer / engineering": r"\bdev(?:s|eloper)?s?\b|\bengineer(?:ing|s)?\b|\bplatform team\b",
+        "CI vendors": r"\bgithub\b|\bgitlab\b|\bazure\b|\bcircleci\b",
+        "security team": r"\bsecurity team\b|\bappsec\b|\bpentest\b|\breview\b|\baudit\b",
+        "sprint / repo": r"\bsprint\b|\brepo(?:s)?\b|\bcommit\b|\bpr\b|\bpull request\b",
+    },
+    whisper_primer=(
+        "A cold call with an AppSec team lead at a SaaS company about securing the "
+        "software supply chain. Terms used: vulnerability, CVE, SAST, DAST, scanner, "
+        "reachability, ASPM, posture, supply chain, SBOM, CI/CD, pipeline, build, "
+        "remediation, auto-fix, alert, finding, noise, exposure, misconfiguration, "
+        "dependency, package, threat, exploit, DevSecOps, AppSec, Application Security."
+    ),
+    freeze_prompts=["Hello? You still there?", "You there?",
+                    "I've got about ten seconds here."],
+    sign_off={True: "Alright. Talk then.", False: "Yeah. Good luck."},
+    beats=_generic_beats(),
+    beat_order=list(GENERIC_BEAT_ORDER),
+    star_stories=list(GENERIC_STAR_STORIES),
+    hook_markers=["appsec", "secu", "scanner", "pipeline", "supply chain", "cve",
+                  "vulnerab", "reachab", "noise", "finding", "sast", "dast",
+                  "copilot", "agent", "code"],
+    c1_priority=["vulnerability / CVE", "supply chain / SBOM", "reachability",
+                 "SAST / DAST", "ASPM / posture", "CI/CD / pipeline"],
+))
+
+
+# ---------------------------------------------------------------------------
 # procore profile (example — construction). Beats are shared with the existing
 # paraphrase module so old behaviour is preserved.
 # ---------------------------------------------------------------------------

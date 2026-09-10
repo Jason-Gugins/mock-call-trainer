@@ -35,6 +35,15 @@ class Shape(unittest.TestCase):
         self.assertEqual(len(stages), 9)
         self.assertTrue(all(s.id for s in stages))
 
+    def test_boostsecurity_is_well_formed(self):
+        p = PF.get_profile("boostsecurity")
+        self.assertTrue(p.buyer_name)
+        self.assertTrue(p.objection_pools.get("status_quo"))
+        self.assertTrue(p.high_value_terms)
+        self.assertTrue(p.pain_drill_cues)
+        self.assertIn("supply chain / SBOM", p.high_value_terms)
+        self.assertIn("boostsecurity", PF.list_profiles())
+
 
 if __name__ == "__main__":
     unittest.main()

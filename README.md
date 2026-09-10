@@ -14,8 +14,9 @@ python mock_call.py --list-profiles    # see what's registered
 ```
 
 **Procore** is kept as one example profile; **generic_saas** (buyer "Alex", VP of
-Ops) is the default. Add your real target — BoostSecurity, Mentimeter, Levitate —
-by copying a profile (see "Adding a company profile" below).
+Ops) is the default; a **boostsecurity** profile (AppSec buyer, real pains) is
+included as a starter for a live target. Add your other employers by copying a
+profile (see "Adding a company profile" below).
 
 Built to run the **Wed 19th** drill from the Mock Call Roleplay Playbook: *"Run three
 full mock calls out loud. Do them badly — the point is reps, not polish. Note every
