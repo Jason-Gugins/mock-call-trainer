@@ -27,12 +27,18 @@ class ScoreObjectionShot(unittest.TestCase):
         self.assertTrue(hit)
         self.assertEqual(verdict, "FAST")
 
-    def test_negative_reverse_slow(self):
+    def test_negative_reverse_ok(self):
         hit, verdict = G.score_objection_shot(
             "So you're telling me it works fine, and what would have to be true for you to change?",
             onset=2.5, froze=False)
         self.assertTrue(hit)
-        self.assertEqual(verdict, "SLOW")
+        self.assertEqual(verdict, "OK")
+
+    def test_cut_in_is_flagged(self):
+        hit, verdict = G.score_objection_shot(
+            "It sounds like this burned you before.", onset=0.2, froze=False)
+        self.assertTrue(hit)
+        self.assertEqual(verdict, "CUT-IN")
 
     def test_feel_felt_found(self):
         hit, verdict = G.score_objection_shot(
@@ -53,6 +59,21 @@ class ScoreObjectionShot(unittest.TestCase):
         self.assertFalse(hit)
         self.assertEqual(verdict, "MISS")
 
+    def test_ack_then_pitch_is_miss(self):
+        # a token label pasted in front of a pitch is still a pitch - FAST here
+        # would reward the exact talking-past-objections failure mode.
+        hit, verdict = G.score_objection_shot(
+            "Fair enough, but our platform is different, you can track everything in one place.",
+            onset=0.8, froze=False)
+        self.assertFalse(hit)
+        self.assertEqual(verdict, "MISS")
+
+    def test_felt_alone_is_not_a_reflex(self):
+        hit, verdict = G.score_objection_shot(
+            "honestly we felt our old vendor was fine", onset=0.4, froze=False)
+        self.assertFalse(hit)
+        self.assertEqual(verdict, "MISS")
+
     def test_freeze_is_miss(self):
         hit, verdict = G.score_objection_shot("", onset=None, froze=True)
         self.assertFalse(hit)
@@ -63,6 +84,13 @@ class ScoreObjectionShot(unittest.TestCase):
             "Fair enough, what would it take for you to look?", onset=None, froze=False)
         self.assertTrue(hit)
         self.assertEqual(verdict, "HIT")
+
+    def test_curiosity_openers_hit(self):
+        for line in ("Can I ask what's behind that?",
+                     "What would need to happen for you to reconsider?",
+                     "That's fair, I don't blame you."):
+            hit, _ = G.score_objection_shot(line, onset=1.0, froze=False)
+            self.assertTrue(hit, msg=line)
 
 
 class ObjectionSummary(unittest.TestCase):

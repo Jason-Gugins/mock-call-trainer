@@ -47,6 +47,12 @@ class ScoreNarrative(unittest.TestCase):
         missing = G.score_narrative_shot("why_company", "I just think it would be a good fit.")
         self.assertIn("missing why_company evidence", missing)
 
+    def test_probably_is_a_hedge(self):
+        missing = G.score_narrative_shot(
+            "why_sales",
+            "Sales is probably right for me because I love working off numbers and data.")
+        self.assertTrue(any("hedging" in m for m in missing))
+
 
 class NarrativeHelpers(unittest.TestCase):
     def test_render_and_history_exist(self):

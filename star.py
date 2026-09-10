@@ -10,7 +10,6 @@ report lists as priority work before deep-stage interviews.
 from __future__ import annotations
 
 import os
-import random
 import time
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
@@ -81,7 +80,7 @@ def run_live(args) -> None:
     print("=" * 72)
     print(f"  STAR STORY DRILL  --  {reps} stories or {minutes} min")
     print("  Each story needs a Situation, Task, Action, Result, and a specific number.")
-    print("  Aim for ~60 seconds (45-90). Rehearse until it's automatic.")
+    print("  Aim for ~60 seconds (30-90). Rehearse until it's automatic.")
     print("=" * 72)
     for i, t in enumerate(profile.star_stories, start=1):
         print(f"    {i}. {t}")
@@ -140,6 +139,8 @@ def run_live(args) -> None:
 
     print()
     print(summary.line)
+    if text_mode:
+        print("  (--text mode: content is graded, but 30-90s length is not measured)")
     print(f"  Elapsed: {summary.elapsed_s:.0f}s of {minutes * 60:.0f}s budget")
     print()
 

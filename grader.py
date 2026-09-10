@@ -769,22 +769,35 @@ OBJECTION_REFLEX_MARKERS = (
     r"\bso you'?re (saying|telling me|saying that)\b",
     r"\bcorrect me if\b", r"\bi hear (you|ya)\b",
     r"\bthat makes sense\b", r"\bmakes sense\b", r"\bfair enough\b",
-    r"\bwhat would (have to|it take|that take)\b",
+    r"\bthat'?s fair\b", r"\byou'?re not wrong\b", r"\bi don'?t blame you\b",
+    r"\bsounds like you'?ve\b",
+    r"\bwhat would (have to|it take|that take|need to)\b",
     r"\bwhat[^?.]{0,25}be true\b",
-    r"\bwhat happened\b", r"\bwhich part\b", r"\bwas it (the|a)\b",
-    r"\bhow (did|does|had) that\b", r"\bhave? you (ever|considered|thought)\b",
-    r"\bfelt\b", r"\bfeel like\b", r"\bfound that\b",
+    r"\bwhat (happened|drives?|'?s (driving|behind|at the root of))\b",
+    r"\bwhich part\b", r"\bwas it (the|a)\b",
+    r"\bhow (did|does|had) that\b", r"\bhow come\b",
+    r"\bcan i ask\b", r"\bwhy'?s that\b", r"\btell me more\b",
+    r"\bhave? you (ever|considered|thought)\b",
+    r"\bi felt (exactly|the same|that)\b", r"\bi feel like\b", r"\bfound that\b",
 )
 
 
 def score_objection_shot(text: str, onset: Optional[float] = None,
                          froze: bool = False) -> Tuple[bool, str]:
-    """Did you open with a reflexive objection move within ~2s?
+    """Did you open with a reflexive objection move, and how fast?
 
-    Returns (reflex_hit, verdict): MISS if no reflexive move, HIT in text mode
-    (no clock), FAST <=2.0s, SLOW otherwise.
+    Returns (reflex_hit, verdict):
+      MISS   - froze, blank, nothing reflexive, or a capability pitch
+               (a token label pasted in front of a pitch is still a pitch)
+      HIT    - text mode (no clock)
+      CUT-IN - onset < 0.4s (finished the buyer's sentence)
+      FAST   - onset <= 2.0s
+      OK     - onset <= 3.5s
+      SLOW   - onset > 3.5s
     """
     if froze or not (text or "").strip():
+        return False, "MISS"
+    if mentions_capability(text):
         return False, "MISS"
     low = _norm(text)
     reflexive = any(re.search(m, low) for m in OBJECTION_REFLEX_MARKERS)
@@ -792,7 +805,13 @@ def score_objection_shot(text: str, onset: Optional[float] = None,
         return False, "MISS"
     if onset is None:
         return True, "HIT"
-    return (True, "FAST") if onset <= 2.0 else (True, "SLOW")
+    if onset < 0.4:
+        return True, "CUT-IN"
+    if onset <= 2.0:
+        return True, "FAST"
+    if onset <= 3.5:
+        return True, "OK"
+    return True, "SLOW"
 
 
 @dataclass
@@ -811,6 +830,8 @@ class ObjectionSummary:
     n: int
     hits: int
     fast: int
+    ok: int
+    cut_in: int
     slow: int
     miss: int
     elapsed_s: float
@@ -819,7 +840,8 @@ class ObjectionSummary:
     @property
     def line(self) -> str:
         return (f"OBJECTION  {self.hits}/{self.n} reflexive  "
-                f"({self.fast} FAST, {self.slow} SLOW, {self.miss} MISS)")
+                f"({self.fast} FAST, {self.ok} OK, {self.cut_in} cut-in, "
+                f"{self.slow} SLOW, {self.miss} MISS)")
 
 
 def summarize_objection(shots: List[ObjectionShot], elapsed_s: float,
@@ -828,6 +850,8 @@ def summarize_objection(shots: List[ObjectionShot], elapsed_s: float,
         n=len(shots),
         hits=sum(1 for s in shots if s.reflex),
         fast=sum(1 for s in shots if s.verdict == "FAST"),
+        ok=sum(1 for s in shots if s.verdict == "OK"),
+        cut_in=sum(1 for s in shots if s.verdict == "CUT-IN"),
         slow=sum(1 for s in shots if s.verdict == "SLOW"),
         miss=sum(1 for s in shots if s.verdict == "MISS"),
         elapsed_s=elapsed_s,
@@ -884,20 +908,25 @@ def append_objection_history(csv_path: Path, session_id: str,
 # Heuristics for "did the STAR skeleton + a number survive". Deliberately
 # lenient: they gate presence of each element, never word-perfect judgment.
 STAR_ARC_MARKERS = {
-    "situation": (r"\b(at|in|when|while|as|during)\b.{0,40}"
+    "situation": (r"\b(at|in|when|while|as|during)\b.{0,45}"
                   r"\b(job|team|store|role|project|office|site|work|drive|window"
-                  r"|summer|shift|restaurant|hospital|storefront)\b"),
-    "task": r"\bi (had|needed|was asked|was responsible|had to|was put|was in charge)\b",
+                  r"|summer|shift|restaurant|hospital|storefront|account|deal|quarter"
+                  r"|territory|campaign|customer|client)\b"),
+    "task": (r"\bi (had|needed|was asked|was responsible|had to|was put|was in charge)\b"
+             r"|\b(asked|handed|tasked|put) me\b"),
     "action": (r"\bi (built|ran|created|set up|launched|wrote|measured|improved|coded"
                r"|designed|trained|led|tracked|cut|raised|increased|lowered|reworked"
-               r"|streamlined|rebuilt|mapped)\b"),
-    "result": (r"\b(so\b|which meant|outcome|result|because of|ended up|in the end"
-               r"|and that|cut it|dropped|rose to)\b"),
+               r"|streamlined|rebuilt|mapped|sold|closed|booked|negotiated|resolved"
+               r"|recovered|coordinated|persuaded|redesigned|delivered|doubled|tripled"
+               r"|saved|won|converted|pitched|called|follow[- ]?ed up)\b"),
+    "result": (r"\b(which meant|outcome|result|because of|ended up|in the end|and that"
+               r"|cut it|dropped|grew|rose|doubled|tripled|fell)\b"
+               r"|\bso (i|we|that)\b"),
 }
 
 
 def score_star_shot(text: str, duration: Optional[float] = None,
-                    target_s: Tuple[float, float] = (45.0, 90.0)) -> List[str]:
+                    target_s: Tuple[float, float] = (30.0, 90.0)) -> List[str]:
     """Returns the list of missing STAR elements. Empty list == solid story."""
     low = _norm(text)
     missing = [k for k, pat in STAR_ARC_MARKERS.items() if not re.search(pat, low)]
@@ -987,19 +1016,21 @@ def append_star_history(csv_path: Path, session_id: str, shots: List[StarShot],
 # Career narrative + gap-answer drill (--narrative)
 # --------------------------------------------------------------------------
 
-NARRATIVE_HEDGE = (r"\bi (think|guess|suppose|maybe|sort of|kind of|not sure"
-                   r"|don'?t know|feel like)\b")
+NARRATIVE_HEDGE = (r"\b(i (think|guess|suppose|maybe|sort of|kind of|not sure|don'?t know"
+                   r"|feel like)|probably|possibly|hopefully|i'?d (say|guess)"
+                   r"|i tend to|somewhat|a bit)\b")
 
 # kind -> (must-have evidence regex, min_words, max_words). Graded by discrete
 # required elements, not by judging the whole narrative.
 NARRATIVE_SPEC = {
     "why_sales": (r"\b(metrics|numbers|data|quant|measure|outbound|project|reps?|"
-                  r"pipeline|analyt|results)\b", 1, 70),
+                  r"pipeline|analyt|results|sales?|sell|deals?|clos(?:e|ing)"
+                  r"|prospects?|quota)\b", 4, 50),
     "why_company": (r"\b(company|product|mission|customers?|market|industry|"
-                    r"opportunity|about (them|this|you))\b", 1, 70),
+                    r"opportunity|about (them|this|you))\b", 4, 50),
     "gap": (r"\b(since|then|after|today|now)\b.{0,60}\b(learn|built|focused|"
             r"self-?taught|studied|launched|outbound|worked|trained|pivoted)\b",
-            1, 60),
+            4, 40),
 }
 
 NARRATIVE_LABELS = {

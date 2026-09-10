@@ -68,7 +68,15 @@ def run_objection_session(
             froze=froze, reflex=reflex, verdict=verdict,
         ))
         extra = f"  {onset:.1f}s" if onset is not None else ""
-        print(f"  [{i}] {verdict}{extra}")
+        hint = ""
+        if verdict == "MISS":
+            if not (text or "").strip():
+                hint = "  (nothing said)"
+            elif grader.mentions_capability(text):
+                hint = "  (that's a pitch, not a reflex)"
+            else:
+                hint = "  (try 'It sounds like...', 'Fair enough, ...', or 'What would it take?')"
+        print(f"  [{i}] {verdict}{extra}{hint}")
     return shots, grader.summarize_objection(shots, now() - start, reps)
 
 
@@ -148,6 +156,8 @@ def run_live(args) -> None:
 
     print()
     print(summary.line)
+    if text_mode:
+        print("  (--text mode: reflexes are graded, but timing is not measured)")
     print(f"  Elapsed: {summary.elapsed_s:.0f}s of {minutes * 60:.0f}s budget")
     print()
 

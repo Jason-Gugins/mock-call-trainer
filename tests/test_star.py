@@ -54,6 +54,21 @@ class ScoreStarShot(unittest.TestCase):
             duration=60)
         self.assertIn("situation", missing)
 
+    def test_broadened_action_and_result_recognized(self):
+        missing = G.score_star_shot(
+            "When our biggest account was at risk, I negotiated better terms and sold two "
+            "new modules. Profit rose 20% that quarter.", duration=60)
+        self.assertNotIn("action", missing)
+        self.assertNotIn("result", missing)
+        self.assertNotIn("situation", missing)
+
+    def test_rambling_with_lone_so_not_solid(self):
+        # bare "so" must not satisfy the result arc.
+        missing = G.score_star_shot(
+            "When I was at work I had to do my job. I built a thing. "
+            "So yeah, there were like 20 people, whatever.", duration=60)
+        self.assertIn("result", missing)
+
 
 class StarSummary(unittest.TestCase):
     def setUp(self):
