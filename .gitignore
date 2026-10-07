@@ -17,6 +17,7 @@ _build_*.py
 
 # Plan-mode artifacts
 .hermes/
+.zcode/
 
 # OS / editor
 Thumbs.db
