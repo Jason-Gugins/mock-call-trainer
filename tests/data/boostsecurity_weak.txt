@@ -1,0 +1,9 @@
+Hi, is this Priya? Great. My name's Jason and I'm calling from a security company.
+Our platform is a complete solution — it scans your code and gives your team full visibility into vulnerabilities across the whole stack.
+Well, we have lots of scanners that would find issues before attackers do.
+It's the best ASPM tool on the market, honestly.
+So yeah, it has dashboards and reports for your posture.
+You'd love it, everyone says it's a game-changer for DevSecOps.
+It will automatically remediate the noise in your pipeline.
+Anyway, I'll send you some information.
+OK, thanks for your time.

@@ -4,6 +4,11 @@ A corpus file is the candidate's 9 turns, one per line, in script order.
 simulate() replays them through the real builder + grader with the same
 landing semantics run_call uses (pain_revealed = turn 4 asked a question;
 meeting_booked = turn 8 offered two times).
+
+The profile is passed by name (the file prefix before _good/_weak).
+persona.build_script dispatches per profile: procore gets its construction
+builder (stage 3 = obj_paper, "paper for 30 years"); every other profile
+gets the generic builder (stage 3 = obj_status).
 """
 from __future__ import annotations
 

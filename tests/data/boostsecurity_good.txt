@@ -1,0 +1,9 @@
+Priya, you don't know me and this is a cold call out of the blue. Can I take thirty seconds to tell you why I called? If it's not for you, just say no and hang up and I'm gone.
+I work with a lot of AppSec leads at fast-growing companies, and the same thing keeps coming up: three scanners, thousands of findings, most of them noise, so developers stop trusting the queue and real vulnerabilities reach production. Is that showing up in your pipeline?
+That's fair, and I won't pretend your developers need another queue of alerts — they don't. When your team triages findings today, though, how do they know which vulnerabilities are actually reachable from the code you ship?
+Walk me through one of those weeks in the build pipeline. When a critical finding lands mid-sprint, who decides whether it gets remediated before the release or backlogged to next quarter?
+Ouch. When real risk hides in a noisy queue, what does that do to your release schedule — do you find out about the dangerous ones before they ship, or after?
+I hear you, and I don't blame you — a tool nobody opens is just noise with a login. When that ASPM tool died, was it the tool itself, or that developers had no reason to open it mid-sprint?
+That's fair. The ones that stick start small: one repo, one pipeline, and only the findings a developer can reach this sprint — AppSec becomes part of the build instead of a separate queue. Would it be worth looking at your backlog together, or should I show your team how we'd scope a two-week pilot?
+That's fair — an email you'll never open helps nobody. I've got Tuesday at 10, or Thursday at 2. Which one should I put on the calendar for the technical walkthrough?
+Perfect, Tuesday at 10 it is. I'll send the invite tonight. So the AE comes ready — do you want her to focus on reachability and triage, or on the supply chain side?

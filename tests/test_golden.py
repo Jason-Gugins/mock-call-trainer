@@ -11,15 +11,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # root: grader,
 import golden
 
 
-GOOD = ["generic_saas_good.txt"]
-WEAK = ["generic_saas_weak.txt"]
+GOOD = [
+    "generic_saas_good.txt",
+    "boostsecurity_good.txt",
+    "mentimeter_good.txt",
+    "levitate_good.txt",
+    "procore_good.txt",
+]
+WEAK = [
+    "generic_saas_weak.txt",
+    "boostsecurity_weak.txt",
+    "mentimeter_weak.txt",
+    "levitate_weak.txt",
+    "procore_weak.txt",
+]
+
+
+def profile_of(name: str) -> str:
+    """'boostsecurity_good.txt' -> 'boostsecurity'.
+
+    The simulate profile is the file prefix before _good/_weak.
+    """
+    return name.replace("_good.txt", "").replace("_weak.txt", "")
 
 
 class GoldenCorpusTests(unittest.TestCase):
     def test_good_calls_grade_4plus_and_yes(self):
         for name in GOOD:
             with self.subTest(name=name):
-                rep = golden.simulate("generic_saas", golden.load_lines(name))
+                rep = golden.simulate(profile_of(name), golden.load_lines(name))
                 detail = "; ".join(f"{c.name}={c.level}" for c in rep.criteria)
                 self.assertGreaterEqual(rep.passed_count, 4, detail)
                 self.assertTrue(rep.verdict.startswith("YES"), rep.verdict)
@@ -27,7 +47,7 @@ class GoldenCorpusTests(unittest.TestCase):
     def test_weak_calls_grade_2orless_and_no(self):
         for name in WEAK:
             with self.subTest(name=name):
-                rep = golden.simulate("generic_saas", golden.load_lines(name))
+                rep = golden.simulate(profile_of(name), golden.load_lines(name))
                 detail = "; ".join(f"{c.name}={c.level}" for c in rep.criteria)
                 self.assertLessEqual(rep.passed_count, 2, detail)
                 self.assertTrue(rep.verdict.startswith("NO"), rep.verdict)
