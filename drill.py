@@ -56,7 +56,7 @@ def run_live(args) -> None:
 
     import numpy as np
 
-    from mock_call import SR, Recorder, Transcriber, Voice
+    from mock_call import PM_VOICE, SR, Recorder, Transcriber, Voice
 
     reps = args.reps
     minutes = args.minutes
@@ -78,7 +78,9 @@ def run_live(args) -> None:
     segments: list = []
     pause = np.zeros(0, dtype=np.float32)
     if not text_mode:
-        voice = Voice(rate=profile.difficulty_rates["normal"], enabled=True)
+        voice = Voice(rate=profile.difficulty_rates["normal"], enabled=True,
+                      voice_name=getattr(args, "voice", "") or profile.tts_voice
+                      or PM_VOICE)
         recorder = Recorder(
             device=args.device,
             trailing_silence=min(args.silence, 1.5),

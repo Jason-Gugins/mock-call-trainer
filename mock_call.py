@@ -71,13 +71,28 @@ def _resample(x: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
     ).astype(np.float32)
 
 
+def best_voice(requested: str, installed: List[str]) -> Optional[str]:
+    """Pick the installed SAPI voice matching `requested`; None when nothing fits."""
+    req = (requested or "").strip().lower()
+    if not req:
+        return None
+    for v in installed:
+        if v.lower() == req:
+            return v
+    contains = [v for v in installed if req in v.lower()]
+    return contains[0] if contains else None
+
+
 class Voice:
     """Windows SAPI text-to-speech for the PM, rendered to WAV so it can also be
     mixed into the session recording."""
 
-    def __init__(self, rate: int = 0, enabled: bool = True):
+    def __init__(self, rate: int = 0, enabled: bool = True,
+                 voice_name: str = PM_VOICE):
         self.rate = rate
         self.enabled = enabled
+        self.requested_voice = voice_name
+        self.voice_name = self._resolve_voice()
         self._tmp = Path(tempfile.mkdtemp(prefix="mockcall_tts_"))
         weakref.finalize(self, self._cleanup, self._tmp)
         self._n = 0
@@ -86,6 +101,28 @@ class Voice:
     def _cleanup(tmp):
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)
+
+    @staticmethod
+    def installed_voices() -> List[str]:
+        ps = ("Add-Type -AssemblyName System.Speech; "
+              "(New-Object System.Speech.Synthesis.SpeechSynthesizer)"
+              ".GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }")
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                             check=True, capture_output=True, text=True, timeout=30)
+        return [ln.strip() for ln in out.stdout.splitlines() if ln.strip()]
+
+    def _resolve_voice(self) -> str:
+        if self.requested_voice == PM_VOICE:
+            return PM_VOICE
+        try:
+            pick = best_voice(self.requested_voice, self.installed_voices())
+        except Exception:                          # noqa: BLE001  (non-Windows etc.)
+            return self.requested_voice            # say()'s try/catch still guards
+        if pick is None:
+            print(f"  (voice '{self.requested_voice}' not installed; "
+                  f"using {PM_VOICE})")
+            return PM_VOICE
+        return pick
 
     def say(self, text: str) -> np.ndarray:
         """Speak `text` aloud; return the audio at 16 kHz mono."""
@@ -101,7 +138,7 @@ class Voice:
         ps = (
             "Add-Type -AssemblyName System.Speech; "
             "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-            f"try {{ $s.SelectVoice('{PM_VOICE}') }} catch {{}}; "
+            f"try {{ $s.SelectVoice('{self.voice_name}') }} catch {{}}; "
             f"$s.Rate = {self.rate}; "
             f"$s.SetOutputToWaveFile('{wav}'); "
             f"$t = Get-Content -Raw -LiteralPath '{txt}'; "
@@ -357,7 +394,10 @@ def run_call(args, script=None) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
 
     text_mode = args.text
-    voice = Voice(rate=profile.difficulty_rates[args.difficulty], enabled=not text_mode)
+    voice = Voice(rate=profile.difficulty_rates[args.difficulty],
+                  enabled=not text_mode,
+                  voice_name=getattr(args, "voice", "") or profile.tts_voice
+                  or PM_VOICE)
     recorder = None
     transcriber = None
     if not text_mode:
@@ -542,6 +582,10 @@ def main() -> None:
                    help="company profile to use (see --list-profiles)")
     p.add_argument("--list-profiles", action="store_true",
                    help="list available profiles and exit")
+    p.add_argument("--voice", default="",
+                   help="buyer TTS voice (SAPI name or part of one; default: profile's)")
+    p.add_argument("--list-voices", action="store_true",
+                   help="list installed Windows TTS voices and exit")
     args = p.parse_args()
 
     if args.list_profiles:
@@ -552,6 +596,14 @@ def main() -> None:
         return
     if args.list_devices:
         list_devices()
+        return
+    if args.list_voices:
+        try:
+            for v in Voice.installed_voices():
+                print(f"  {v}")
+        except Exception as exc:                  # noqa: BLE001
+            print(failure_hint(exc))
+            return
         return
     if args.list_beats:
         import paraphrase

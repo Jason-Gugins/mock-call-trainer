@@ -97,6 +97,7 @@ class Profile:
     hook_markers: List[str] = field(default_factory=list)
     c1_priority: List[str] = field(default_factory=list)
     build_script: Callable = None     # bound to build_script() by register()
+    tts_voice: str = ""              # Windows SAPI voice name; "" = system default
 
 
 def build_script(difficulty: str, rng: random.Random, profile: Profile) -> List[Stage]:
@@ -387,6 +388,7 @@ register(Profile(
                   "quota", "demo", "dark", "follow up", "follow-up", "nurture"],
     c1_priority=["pipeline", "crm", "conversion / kpi", "churn",
                  "lead / mql / sql", "forecast / revenue"],
+    tts_voice="Microsoft David Desktop",
 ))
 
 
@@ -499,6 +501,7 @@ register(Profile(
                   "copilot", "agent", "code"],
     c1_priority=["vulnerability / CVE", "supply chain / SBOM", "reachability",
                  "SAST / DAST", "ASPM / posture", "CI/CD / pipeline"],
+    tts_voice="Microsoft Zira Desktop",
 ))
 
 
@@ -610,6 +613,7 @@ register(Profile(
                   "adoption", "impact", "feedback", "poll"],
     c1_priority=["engagement", "training / L&D", "impact / behavior", "adoption",
                  "measurement / KPI", "all-hands / comms"],
+    tts_voice="Microsoft Zira Desktop",
 ))
 
 
@@ -729,6 +733,7 @@ register(Profile(
                   "personal outreach", "lead gen", "architect", "builder"],
     c1_priority=["book of business", "referral", "follow-up", "top of mind",
                  "relationship", "client / policyholder"],
+    tts_voice="Microsoft Zira Desktop",
 ))
 
 
@@ -847,6 +852,7 @@ _procore = Profile(
                   "shortage", "prompt payment", "adjudication", "holdback", "peers"],
     c1_priority=["RFI", "submittal", "change order", "closeout",
                  "daily log", "drawing revision / superseded set"],
+    tts_voice="Microsoft David Desktop",
 )
 register(_procore)
 
