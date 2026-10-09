@@ -277,6 +277,24 @@ def hud_line(i: int, total: int, stage_id: str, questions: int,
             f"questions {questions} · objections handled {objections_handled}]")
 
 
+def failure_hint(exc: Exception) -> str:
+    """One actionable line-set for the failures we actually see in the wild."""
+    cls = type(exc).__name__.lower()
+    msg = str(exc).lower()
+    if "portaudio" in cls or "input device" in msg or "unanticipated" in msg \
+            or "invalid device" in msg or "no default" in msg:
+        return ("  [mic] couldn't open your microphone.\n"
+                "       Check it's plugged in and not held exclusively by another app\n"
+                "       (Teams/Zoom/Discord do this), then:  python mock_call.py --list-devices\n"
+                "       Or practise silently:                     python mock_call.py --text")
+    if "download" in msg or "hugging face" in msg or "huggingface" in msg \
+            or "connection" in msg or "could not" in msg and "model" in msg:
+        return ("  [model] the transcription model failed to load or download.\n"
+                "       Connect to the internet once so faster-whisper can fetch it,\n"
+                "       or try a smaller model:  python mock_call.py --model tiny.en")
+    return f"  [error] {type(exc).__name__}: {exc}"
+
+
 # --------------------------------------------------------------------------
 # The call
 # --------------------------------------------------------------------------
@@ -355,8 +373,12 @@ def run_call(args, script=None) -> None:
     print("=" * 72)
     if not text_mode:
         print("  Wear headphones so the mic doesn't pick up his voice.")
-        recorder.calibrate()
-        transcriber._load()
+        try:
+            recorder.calibrate()
+            transcriber._load()
+        except Exception as exc:                      # noqa: BLE001
+            print(failure_hint(exc))
+            sys.exit(2)
     print()
     input("  Press ENTER to dial... ")
     print()
@@ -385,13 +407,25 @@ def run_call(args, script=None) -> None:
                 said = input("YOU> ").strip()
                 rec = Recording(np.zeros(0, dtype=np.float32), None, 0.0, [], froze=not said)
             else:
-                rec = recorder.record_turn()
+                try:
+                    rec = recorder.record_turn()
+                except Exception as exc:              # noqa: BLE001
+                    print(failure_hint(exc))
+                    state.partial = True
+                    _persist(outdir, session_id, state, args, profile, text_mode)
+                    sys.exit(2)
                 if rec.froze:
                     prompt = rng.choice(profile.freeze_prompts)
                     print(f"{profile.buyer_name} (PM): {prompt}")
                     state.segments.append(voice.say(prompt))
                     state.segments.append(pause)
-                    rec = recorder.record_turn()
+                    try:
+                        rec = recorder.record_turn()
+                    except Exception as exc:          # noqa: BLE001
+                        print(failure_hint(exc))
+                        state.partial = True
+                        _persist(outdir, session_id, state, args, profile, text_mode)
+                        sys.exit(2)
                 state.turn_starts.append(sum(s.size for s in state.segments) / SR)
                 state.segments.append(rec.audio)
                 state.segments.append(pause)
