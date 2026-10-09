@@ -308,10 +308,16 @@ class CallState:
     pain_revealed: bool = False
     meeting_booked: bool = False
     partial: bool = False
+    persisted: bool = False
 
 
 def _persist(outdir: Path, session_id: str, state: CallState, args,
              profile, text_mode: bool) -> None:
+    # Idempotent: the failure_hint handlers persist before sys.exit(2), and the
+    # loop's exception net would persist again -- a second run would duplicate
+    # the history.csv row and re-print the scorecard.
+    if state.persisted:
+        return
     report = grader.grade(state.turns, args.difficulty, state.pain_revealed,
                           state.meeting_booked, profile=profile,
                           warmth_path=state.warmth_path,
@@ -338,6 +344,7 @@ def _persist(outdir: Path, session_id: str, state: CallState, args,
     if not text_mode:
         print(f"  Audio:   {outdir / 'session.wav'}")
     print(f"  History: {SESSIONS / 'history.csv'}\n")
+    state.persisted = True
 
 
 def run_call(args, script=None) -> None:
@@ -469,10 +476,6 @@ def run_call(args, script=None) -> None:
         state.partial = True
         _persist(outdir, session_id, state, args, profile, text_mode)
         return
-    except SystemExit:
-        # failure_hint handlers persist the partial themselves before
-        # sys.exit(2); persisting again here would duplicate the history row.
-        raise
     except BaseException:
         state.partial = True
         _persist(outdir, session_id, state, args, profile, text_mode)
