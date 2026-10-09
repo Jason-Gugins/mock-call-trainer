@@ -269,6 +269,13 @@ def _landed(stage_id: str, text: str, profile) -> bool:
     return True
 
 
+def hud_line(i: int, total: int, stage_id: str, questions: int,
+             objections_handled: int, warmth: int) -> str:
+    """One-line ledger of the exact numbers the grader will judge."""
+    return (f"  [turn {i}/{total} · warmth {warmth}% · "
+            f"questions {questions} · objections handled {objections_handled}]")
+
+
 # --------------------------------------------------------------------------
 # The call
 # --------------------------------------------------------------------------
