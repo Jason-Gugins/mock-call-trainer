@@ -281,10 +281,51 @@ def hud_line(i: int, total: int, stage_id: str, questions: int,
 # The call
 # --------------------------------------------------------------------------
 
-def run_call(args) -> None:
+@dataclass
+class CallState:
+    segments: List[np.ndarray] = field(default_factory=list)
+    turns: List[Turn] = field(default_factory=list)
+    turn_starts: List[float] = field(default_factory=list)
+    warmth_path: List[int] = field(default_factory=lambda: [grader.WARMTH_START])
+    pain_revealed: bool = False
+    meeting_booked: bool = False
+    partial: bool = False
+
+
+def _persist(outdir: Path, session_id: str, state: CallState, args,
+             profile, text_mode: bool) -> None:
+    report = grader.grade(state.turns, args.difficulty, state.pain_revealed,
+                          state.meeting_booked, profile=profile,
+                          warmth_path=state.warmth_path,
+                          turn_starts=state.turn_starts)
+    if state.partial:
+        report.verdict = (f"PARTIAL -- call aborted after {len(state.turns)} "
+                          f"turn(s). " + report.verdict)
+    print(grader.render_console(report))
+
+    if not text_mode:
+        parts = [s for s in state.segments if s.size]
+        if parts:                      # fixes np.concatenate([]) ValueError
+            import soundfile as sf
+            full = np.concatenate(parts)
+            peak = float(np.max(np.abs(full))) or 1.0
+            sf.write(str(outdir / "session.wav"),
+                     (full / peak * 0.95).astype(np.float32), SR)
+
+    (outdir / "report.md").write_text(
+        grader.render_markdown(report, session_id, "session.wav"), encoding="utf-8")
+    grader.append_history(SESSIONS / "history.csv", session_id, report)
+
+    print(f"\n  Report:  {outdir / 'report.md'}")
+    if not text_mode:
+        print(f"  Audio:   {outdir / 'session.wav'}")
+    print(f"  History: {SESSIONS / 'history.csv'}\n")
+
+
+def run_call(args, script=None) -> None:
     rng = random.Random(args.seed)
     profile = profiles.get_profile(args.profile)
-    script = persona.build_script(args.difficulty, rng, profile)
+    script = script or persona.build_script(args.difficulty, rng, profile)
 
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     outdir = SESSIONS / profile.name / session_id
@@ -320,101 +361,85 @@ def run_call(args) -> None:
     input("  Press ENTER to dial... ")
     print()
 
-    segments: List[np.ndarray] = []
-    turns: List[Turn] = []
+    state = CallState()
     landed = True
-    pain_revealed = False
-    meeting_booked = False
     pause = np.zeros(int(0.35 * SR), dtype=np.float32)
-    warmth = grader.WARMTH_START
-    warmth_path = [warmth]
 
-    for i, stage in enumerate(script, start=1):
-        if stage.id == "pain_reveal":
-            pain_revealed = landed
-        line = stage.line(meeting_booked if stage.id == "resolution" else landed)
+    try:
+        for i, stage in enumerate(script, start=1):
+            if stage.id == "pain_reveal":
+                state.pain_revealed = landed
+            line = stage.line(state.meeting_booked if stage.id == "resolution" else landed)
 
-        print(f"{profile.buyer_name} (PM): {line}")
-        segments.append(voice.say(line))
-        segments.append(pause)
+            print(f"{profile.buyer_name} (PM): {line}")
+            state.segments.append(voice.say(line))
+            state.segments.append(pause)
 
-        # ---- candidate turn ------------------------------------------------
-        q_so_far = sum(grader.count_discovery_questions(t.text) for t in turns)
-        obj_handled = sum(1 for t in turns if t.is_objection
-                          and grader.is_acknowledged(t.text) and grader.has_question(t.text))
-        print(hud_line(i, len(script), stage.id, q_so_far, obj_handled, warmth))
-        if text_mode:
-            said = input("YOU> ").strip()
-            rec = Recording(np.zeros(0, dtype=np.float32), None, 0.0, [], froze=not said)
-        else:
-            rec = recorder.record_turn()
-            if rec.froze:
-                prompt = rng.choice(profile.freeze_prompts)
-                print(f"{profile.buyer_name} (PM): {prompt}")
-                segments.append(voice.say(prompt))
-                segments.append(pause)
+            # ---- candidate turn ------------------------------------------------
+            q_so_far = sum(grader.count_discovery_questions(t.text) for t in state.turns)
+            obj_handled = sum(1 for t in state.turns if t.is_objection
+                              and grader.is_acknowledged(t.text) and grader.has_question(t.text))
+            print(hud_line(i, len(script), stage.id, q_so_far, obj_handled,
+                           state.warmth_path[-1]))
+            if text_mode:
+                said = input("YOU> ").strip()
+                rec = Recording(np.zeros(0, dtype=np.float32), None, 0.0, [], froze=not said)
+            else:
                 rec = recorder.record_turn()
-            segments.append(rec.audio)
-            segments.append(pause)
-            print("  transcribing...", end="", flush=True)
-            said = transcriber.transcribe(rec.audio)
-            print("\r" + " " * 20 + "\r", end="")
-            print(f"YOU: {said or '[silence]'}")
-            bits = []
-            if rec.onset is not None:
-                bits.append(f"first word after {rec.onset:.1f}s")
-            if rec.duration:
-                bits.append(f"{rec.duration:.0f}s")
-            if rec.gaps:
-                bits.append("gaps " + ", ".join(f"{g:.1f}s" for g in rec.gaps))
-            if bits:
-                print(f"     ({'; '.join(bits)})")
+                if rec.froze:
+                    prompt = rng.choice(profile.freeze_prompts)
+                    print(f"{profile.buyer_name} (PM): {prompt}")
+                    state.segments.append(voice.say(prompt))
+                    state.segments.append(pause)
+                    rec = recorder.record_turn()
+                state.turn_starts.append(sum(s.size for s in state.segments) / SR)
+                state.segments.append(rec.audio)
+                state.segments.append(pause)
+                print("  transcribing...", end="", flush=True)
+                said = transcriber.transcribe(rec.audio)
+                print("\r" + " " * 20 + "\r", end="")
+                print(f"YOU: {said or '[silence]'}")
+                bits = []
+                if rec.onset is not None:
+                    bits.append(f"first word after {rec.onset:.1f}s")
+                if rec.duration:
+                    bits.append(f"{rec.duration:.0f}s")
+                if rec.gaps:
+                    bits.append("gaps " + ", ".join(f"{g:.1f}s" for g in rec.gaps))
+                if bits:
+                    print(f"     ({'; '.join(bits)})")
 
-        turns.append(Turn(
-            index=i, stage_id=stage.id, expects=stage.expects, pm_line=line,
-            text=said, onset_latency=rec.onset, duration=rec.duration,
-            internal_gaps=rec.gaps, is_objection=stage.is_objection,
-            objection_label=stage.objection_label, froze=rec.froze and not said,
-        ))
+            state.turns.append(Turn(
+                index=i, stage_id=stage.id, expects=stage.expects, pm_line=line,
+                text=said, onset_latency=rec.onset, duration=rec.duration,
+                internal_gaps=rec.gaps, is_objection=stage.is_objection,
+                objection_label=stage.objection_label, froze=rec.froze and not said,
+            ))
 
-        landed = _landed(stage.id, said, profile)
-        warmth = warmth_update(warmth, landed)
-        warmth_path.append(warmth)
-        if i > 1:
-            print(f"  warmth {warmth_bar(warmth)}")
-        if stage.id == "obj_close":
-            meeting_booked = len(grader.find_time_offers(said)) >= 2
-        print()
+            landed = _landed(stage.id, said, profile)
+            warmth = warmth_update(state.warmth_path[-1], landed)
+            state.warmth_path.append(warmth)
+            if i > 1:
+                print(f"  warmth {warmth_bar(warmth)}")
+            if stage.id == "obj_close":
+                state.meeting_booked = len(grader.find_time_offers(said)) >= 2
+            print()
 
-    sign_off = profile.sign_off[meeting_booked]
-    print(f"{profile.buyer_name} (PM): {sign_off}")
-    segments.append(voice.say(sign_off))
-    print("\n  *click*\n")
-
-    # ---- grade ----------------------------------------------------------
-    report = grader.grade(turns, args.difficulty, pain_revealed, meeting_booked,
-                          profile=profile, warmth_path=warmth_path)
-    console = grader.render_console(report)
-    print(console)
-
-    wav_name = "session.wav"
-    if not text_mode:
-        import soundfile as sf
-        full = np.concatenate([s for s in segments if s.size]) if segments else np.zeros(1)
-        peak = float(np.max(np.abs(full))) or 1.0
-        sf.write(str(outdir / wav_name), (full / peak * 0.95).astype(np.float32), SR)
-
-    (outdir / "report.md").write_text(
-        grader.render_markdown(report, session_id, wav_name), encoding="utf-8"
-    )
-    grader.append_history(SESSIONS / "history.csv", session_id, report)
-
-    print()
-    print(f"  Report:  {outdir / 'report.md'}")
-    if not text_mode:
-        print(f"  Audio:   {outdir / wav_name}")
-    print(f"  History: {SESSIONS / 'history.csv'}")
-    print()
+        sign_off = profile.sign_off[state.meeting_booked]
+        print(f"{profile.buyer_name} (PM): {sign_off}")
+        state.segments.append(voice.say(sign_off))
+        print("\n  *click*\n")
+    except EOFError:
+        # Dry pipe in --text mode: the call is over, not crashed. Save what we
+        # have and end the rep gracefully (KeyboardInterrupt et al. re-raise).
+        state.partial = True
+        _persist(outdir, session_id, state, args, profile, text_mode)
+        return
+    except BaseException:
+        state.partial = True
+        _persist(outdir, session_id, state, args, profile, text_mode)
+        raise
+    _persist(outdir, session_id, state, args, profile, text_mode)
 
 
 def list_devices() -> None:
@@ -514,7 +539,7 @@ def main() -> None:
     try:
         run_call(args)
     except KeyboardInterrupt:
-        print("\n\n  Call abandoned. Run it again -- reps are the point.\n")
+        print("\n\n  Call abandoned -- partial session saved. Run it again: reps are the point.\n")
         sys.exit(130)
 
 

@@ -121,11 +121,9 @@ class LiveLoopTests(unittest.TestCase):
             md = reports[0].read_text(encoding="utf-8")
             self.assertIn("Buyer temperature", md)
 
-    @unittest.expectedFailure   # remove in Task 4 when the crash-safe net lands
     def test_partial_pipe_saves_on_eof(self):
-        # Piped input runs dry after 3 turns. In Task 3 the EOFError legitimately
-        # escapes run_call (no net yet) -- expectedFailure keeps red->green
-        # honest. In Task 4 the same input becomes a graceful PARTIAL save.
+        # Piped input runs dry after 3 turns: the EOFError becomes a graceful
+        # PARTIAL save (crash-safe net landed in Task 4).
         with tempfile.TemporaryDirectory() as tmp:
             self._run_text_call(WARM_CALL[:3], tmp, eof=True)
 
