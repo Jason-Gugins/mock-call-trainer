@@ -469,6 +469,10 @@ def run_call(args, script=None) -> None:
         state.partial = True
         _persist(outdir, session_id, state, args, profile, text_mode)
         return
+    except SystemExit:
+        # failure_hint handlers persist the partial themselves before
+        # sys.exit(2); persisting again here would duplicate the history row.
+        raise
     except BaseException:
         state.partial = True
         _persist(outdir, session_id, state, args, profile, text_mode)

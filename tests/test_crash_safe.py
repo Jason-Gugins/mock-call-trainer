@@ -87,6 +87,19 @@ class CrashSafeTests(unittest.TestCase):
             reports = list((Path(tmp) / "generic_saas").rglob("report.md"))
             self.assertTrue(reports and "PARTIAL" in reports[0].read_text(encoding="utf-8"))
 
+    def test_system_exit_persists_exactly_once(self):
+        # A mid-call mic death raises SystemExit from the failure_hint handler
+        # after it has already persisted the partial. The outer net must let it
+        # through WITHOUT persisting again (duplicate history.csv row).
+        profile = profiles.get_profile("generic_saas")
+        stages = profiles.build_script("normal", random.Random(0), profile)
+        stages[3] = _Boom(stages[3], SystemExit(2))
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                self._run(tmp, stages, WARM_CALL)
+            hist = (Path(tmp) / "history.csv").read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(hist), 2, "header + exactly one data row")
+
 
 if __name__ == "__main__":
     unittest.main()
