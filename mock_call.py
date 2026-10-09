@@ -38,6 +38,7 @@ import grader
 import persona
 import profiles
 from grader import Turn
+from grader import warmth_update, warmth_bar
 
 ROOT = Path(__file__).resolve().parent
 # Overridable so the CLI tests can't append to the real sessions/ and history.csv.
@@ -325,6 +326,8 @@ def run_call(args) -> None:
     pain_revealed = False
     meeting_booked = False
     pause = np.zeros(int(0.35 * SR), dtype=np.float32)
+    warmth = grader.WARMTH_START
+    warmth_path = [warmth]
 
     for i, stage in enumerate(script, start=1):
         if stage.id == "pain_reveal":
@@ -336,6 +339,10 @@ def run_call(args) -> None:
         segments.append(pause)
 
         # ---- candidate turn ------------------------------------------------
+        q_so_far = sum(grader.count_discovery_questions(t.text) for t in turns)
+        obj_handled = sum(1 for t in turns if t.is_objection
+                          and grader.is_acknowledged(t.text) and grader.has_question(t.text))
+        print(hud_line(i, len(script), stage.id, q_so_far, obj_handled, warmth))
         if text_mode:
             said = input("YOU> ").strip()
             rec = Recording(np.zeros(0, dtype=np.float32), None, 0.0, [], froze=not said)
@@ -371,6 +378,10 @@ def run_call(args) -> None:
         ))
 
         landed = _landed(stage.id, said, profile)
+        warmth = warmth_update(warmth, landed)
+        warmth_path.append(warmth)
+        if i > 1:
+            print(f"  warmth {warmth_bar(warmth)}")
         if stage.id == "obj_close":
             meeting_booked = len(grader.find_time_offers(said)) >= 2
         print()
@@ -382,7 +393,7 @@ def run_call(args) -> None:
 
     # ---- grade ----------------------------------------------------------
     report = grader.grade(turns, args.difficulty, pain_revealed, meeting_booked,
-                          profile=profile)
+                          profile=profile, warmth_path=warmth_path)
     console = grader.render_console(report)
     print(console)
 

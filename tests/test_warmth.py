@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import sys
+import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -55,6 +58,76 @@ class RenderTests(unittest.TestCase):
     def test_history_fields_unchanged(self):
         # Guard: the whole point is no history.csv schema drift in wave 1.
         self.assertNotIn("warmth", G.HISTORY_FIELDS)
+
+
+WARM_CALL = [
+    # 9 candidate turns in stage order; landing every beat keeps warmth >= 50
+    "Alex, you don't know me and this is a cold call out of the blue. "
+    "Can I take thirty seconds to tell you why I called? If it's not for you, "
+    "just say no and hang up and I'm gone.",
+    "I work with a lot of VPs of Operations, and the same thing keeps coming up: "
+    "marketing hands sales a pile of leads, and half of them die in the follow-up "
+    "gap before anyone picks up the phone. Is that showing up in your pipeline?",
+    "That's fair, and I won't pretend your process is broken when you're hitting "
+    "your numbers. When a rep leaves, though, how much of the CRM history walks "
+    "out the door with them?",
+    "Walk me through your follow-up process. When a deal stalls, how does the "
+    "rep know what got promised to that customer?",
+    "Ouch. When that follow-up gap eats a quarter, what does that do to your "
+    "forecast — do you find out before the number slips, or after?",
+    "I hear you, and I don't blame you — that happens more than vendors admit. "
+    "Was it the tool itself, or the rollout that never gave the team a reason "
+    "to open it?",
+    "That's fair. The ones that stick start with one team, one pipeline, and a "
+    "reason to open it every morning. Would it be worth looking at your "
+    "follow-up numbers together, or should I show your team the flow?",
+    "Completely fair. Instead of an email you'll never open — I've got Tuesday "
+    "at 10, or Thursday at 2. Which one should I put on the calendar?",
+    "Perfect, Tuesday at 10 it is. I'll send the invite tonight. So I can prep — "
+    "what do you want your AE to come ready to cover?",
+]
+
+
+class LiveLoopTests(unittest.TestCase):
+    def _run_text_call(self, lines, tmp, eof=False):
+        import mock_call as m
+        old = m.SESSIONS
+        m.SESSIONS = Path(tmp)
+        args = types.SimpleNamespace(
+            difficulty="normal", profile="generic_saas", text=True, seed=None,
+            model="base.en", fast=False, device=None, silence=3.0,
+        )
+        it = iter(lines)
+
+        def fake_input(prompt=""):
+            try:
+                return next(it)
+            except StopIteration:
+                if eof:
+                    raise EOFError   # what real input() does when a pipe runs dry
+                return ""            # a frozen (silent) turn
+
+        try:
+            with mock.patch("builtins.input", fake_input):
+                m.run_call(args)
+        finally:
+            m.SESSIONS = old
+
+    def test_warmth_path_in_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_text_call(WARM_CALL, tmp)
+            reports = list(Path(tmp).glob("**/report.md"))
+            self.assertEqual(len(reports), 1)
+            md = reports[0].read_text(encoding="utf-8")
+            self.assertIn("Buyer temperature", md)
+
+    @unittest.expectedFailure   # remove in Task 4 when the crash-safe net lands
+    def test_partial_pipe_saves_on_eof(self):
+        # Piped input runs dry after 3 turns. In Task 3 the EOFError legitimately
+        # escapes run_call (no net yet) -- expectedFailure keeps red->green
+        # honest. In Task 4 the same input becomes a graceful PARTIAL save.
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_text_call(WARM_CALL[:3], tmp, eof=True)
 
 
 if __name__ == "__main__":
