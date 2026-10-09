@@ -578,7 +578,10 @@ def run_live(args) -> None:
     pause = np.zeros(0, dtype=np.float32)
     if not text_mode:
         import persona
-        voice = Voice(rate=persona.DIFFICULTY_RATE["normal"], enabled=True)
+        voice = Voice(rate=persona.DIFFICULTY_RATE["normal"], enabled=True,
+                      voice_name=getattr(args, "voice", "")
+                      or get_profile(getattr(args, "profile", None)
+                                     or DEFAULT_PROFILE).tts_voice)
         recorder = Recorder(device=args.device,
                             trailing_silence=min(args.silence, 2.0),
                             max_seconds=25.0)

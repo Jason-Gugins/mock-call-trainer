@@ -7,7 +7,6 @@ moment. No external assets, works offline straight from disk.
 from __future__ import annotations
 
 import base64
-from typing import Sequence
 
 import grader
 
@@ -63,7 +62,7 @@ def render(session_id: str, rep: grader.Report, wav_bytes: bytes) -> str:
             f"<button class='turnbtn' data-start=\"{start:.1f}\">&#9654; from here</button>"
             f"<b>{_esc(who)}:</b> {_esc(t.pm_line)}</div>"
             f"<div class='turn'><time>{start + (t.onset_latency or 0):.1f}s</time> "
-            f"<button class='turnbtn' data-start=\"{start:.1f}\">&#9654;</button>"
+            f"<button class='turnbtn' data-start=\"{start + (t.onset_latency or 0):.1f}\">&#9654;</button>"
             f"<b>YOU:</b> {_esc(t.text) or '<i>[silence]</i>'} "
             f"<span class='meta'>{_esc(_timing(t))}</span></div>")
     out.append(f"<script>{_JS}</script></body></html>")

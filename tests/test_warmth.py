@@ -126,6 +126,9 @@ class LiveLoopTests(unittest.TestCase):
         # PARTIAL save (crash-safe net landed in Task 4).
         with tempfile.TemporaryDirectory() as tmp:
             self._run_text_call(WARM_CALL[:3], tmp, eof=True)
+            reports = list(Path(tmp).glob("**/report.md"))
+            self.assertEqual(len(reports), 1)
+            self.assertIn("PARTIAL", reports[0].read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

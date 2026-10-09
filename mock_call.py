@@ -92,7 +92,8 @@ class Voice:
         self.rate = rate
         self.enabled = enabled
         self.requested_voice = voice_name
-        self.voice_name = self._resolve_voice()
+        # Resolution spawns PowerShell; skip it when TTS is off (--text mode).
+        self.voice_name = self._resolve_voice() if enabled else voice_name
         self._tmp = Path(tempfile.mkdtemp(prefix="mockcall_tts_"))
         weakref.finalize(self, self._cleanup, self._tmp)
         self._n = 0
@@ -389,8 +390,10 @@ def _persist(outdir: Path, session_id: str, state: CallState, args,
 
     print(f"\n  Report:  {outdir / 'report.md'}")
     if not text_mode:
-        print(f"  Audio:   {outdir / 'session.wav'}")
-        print(f"  Listen:  {outdir / 'session.html'}")
+        wrote_audio = bool([s for s in state.segments if s.size])
+        if wrote_audio:
+            print(f"  Audio:   {outdir / 'session.wav'}")
+            print(f"  Listen:  {outdir / 'session.html'}")
     print(f"  History: {SESSIONS / 'history.csv'}\n")
     state.persisted = True
 
@@ -438,7 +441,15 @@ def run_call(args, script=None) -> None:
             print(failure_hint(exc))
             sys.exit(2)
     print()
-    input("  Press ENTER to dial... ")
+    try:
+        input("  Press ENTER to dial... ")
+    except KeyboardInterrupt:
+        # Nothing was persisted yet -- do not claim a partial save.
+        print("\n\n  Call abandoned before it started.\n")
+        sys.exit(130)
+    except EOFError:
+        print("\n\n  No input (dry pipe). Call never started.\n")
+        sys.exit(130)
     print()
 
     state = CallState()
@@ -488,7 +499,14 @@ def run_call(args, script=None) -> None:
                 state.segments.append(rec.audio)
                 state.segments.append(pause)
                 print("  transcribing...", end="", flush=True)
-                said = transcriber.transcribe(rec.audio)
+                try:
+                    said = transcriber.transcribe(rec.audio)
+                except Exception as exc:              # noqa: BLE001
+                    print(f"\r" + " " * 20 + "\r", end="")
+                    print(failure_hint(exc))
+                    state.partial = True
+                    _persist(outdir, session_id, state, args, profile, text_mode)
+                    sys.exit(2)
                 print("\r" + " " * 20 + "\r", end="")
                 print(f"YOU: {said or '[silence]'}")
                 bits = []
