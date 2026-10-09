@@ -74,6 +74,11 @@ that makes you sound native). Sanity-check with `mock_call.py --text --profile <
 
 If you go silent too long he'll say *"Hello? You still there?"* — same as a real prospect.
 
+While you talk, a HUD line keeps the grader's ledger in front of you — `[turn 3/9 ·
+warmth 62% · questions 2 · objections handled 1]` — and after each of your turns a
+**buyer temperature** bar shows whether the beat landed (he warms when you handle
+him, cools when you pitch or freeze). The full trajectory ends up in the report.
+
 ---
 
 ## Difficulty modes
@@ -194,11 +199,18 @@ and the three things to fix on your next rep.
 
 ## Outputs
 
-Each session writes to `sessions/<timestamp>/`:
+Each session writes to `sessions/<profile>/<timestamp>/`:
 
 - **`session.wav`** — the full call, both sides, so you can listen back
+- **`session.html`** — the same audio embedded in one self-contained page with a
+  clickable transcript: hit `▶ from here` on any turn to hear that exact moment
+  (works offline, straight from disk)
 - **`report.md`** — scorecard, leak metrics, and the annotated transcript with your
   timings on every turn
+
+A call that dies halfway (Ctrl+C, mic unplugged, crash) is **not lost**: whatever
+happened is saved as a PARTIAL session — report, audio so far, and a history row —
+so a fried rep still counts as evidence.
 
 Plus one row per rep in **`sessions/history.csv`**, so you can watch the numbers move
 across reps the same way you'd track a funnel. For a per-session progression of the
@@ -227,6 +239,8 @@ banned words, freezes), run `python trend.py`.
 | `--jaccard` | Content-word overlap that counts as reciting (default 0.70). |
 | `--profile` | Company profile: `generic_saas` (default), `procore`, or any you add. |
 | `--list-profiles` | List registered profiles and exit. |
+| `--voice` | Buyer TTS voice (SAPI name, or any part of one). Default: the profile's own voice. |
+| `--list-voices` | List installed Windows TTS voices and exit. |
 | `--objection` | Objection first-15-seconds reflex drill: label, negative-reverse, or feel/felt/found within 2s. |
 | `--star` | STAR story drill: each answer needs a number + a full situation/task/action/result arc, ~60s. |
 | `--narrative` | Career-narrative drill: why sales / why this company / the 2018-2023 gap answer. |
@@ -284,6 +298,7 @@ Get-Content .\tests\weak_call.txt | .\.venv\Scripts\python.exe mock_call.py --te
 | `narrative.py` | Career-narrative + gap-answer drill |
 | `regrade.py` | Re-score saved sessions with the current grader (profile-aware) |
 | `trend.py` | Cross-session progress view of history.csv (optional `--profile`) |
+| `listenback.py` | Renders the single-file `session.html` listen-back player |
 | `run.bat` | Double-click launcher |
 | `drill.bat` | Double-click pain-reveal drill |
 | `paraphrase.bat` | Double-click paraphrase drill |
