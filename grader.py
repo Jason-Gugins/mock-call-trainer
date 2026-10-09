@@ -287,6 +287,35 @@ def score_drill_shot(text: str, onset: Optional[float], froze: bool) -> Tuple[bo
     return True, "SLOW"
 
 
+# --------------------------------------------------------------------------
+# Buyer temperature (display only; never written to history.csv)
+# --------------------------------------------------------------------------
+
+WARMTH_START = 50
+WARMTH_HIT, WARMTH_MISS = 12, -18
+
+
+def warmth_update(score: int, landed: bool) -> int:
+    return max(0, min(100, score + (WARMTH_HIT if landed else WARMTH_MISS)))
+
+
+def warmth_label(score: int) -> str:
+    if score >= 75:
+        return "HOT"
+    if score >= 50:
+        return "WARM"
+    if score >= 25:
+        return "COOL"
+    return "COLD"
+
+
+def warmth_bar(score: int) -> str:
+    score = max(0, min(100, score))
+    cells = 20
+    filled = round(score / 100 * cells)
+    return f"[{'█' * filled}{'░' * (cells - filled)}] {score:3d}%  {warmth_label(score)}"
+
+
 @dataclass
 class DrillShot:
     index: int
@@ -388,6 +417,8 @@ class Report:
     difficulty: str
     profile: str = ""
     buyer: str = ""
+    warmth_path: List[int] = field(default_factory=list)
+    turn_starts: List[float] = field(default_factory=list)   # used by Task 6
 
     @property
     def score_line(self) -> str:
@@ -399,7 +430,9 @@ def _level(strong: bool, ok: bool) -> str:
 
 
 def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
-          meeting_booked: bool, profile: Optional[profiles.Profile] = None) -> Report:
+          meeting_booked: bool, profile: Optional[profiles.Profile] = None,
+          warmth_path: Optional[List[int]] = None,
+          turn_starts: Optional[List[float]] = None) -> Report:
     if profile is None:
         profile = profiles.get_profile("procore")
     candidate_turns = [t for t in turns if t.text.strip() or t.froze]
@@ -591,7 +624,9 @@ def grade(turns: List[Turn], difficulty: str, pain_revealed: bool,
         coach.append("Nothing failed. Push for STRONG on the criteria still at PASS.")
 
     return Report(criteria, leaks, verdict, passed, coach[:3], turns, difficulty,
-                  profile=profile.name, buyer=profile.buyer_name)
+                  profile=profile.name, buyer=profile.buyer_name,
+                  warmth_path=list(warmth_path or []),
+                  turn_starts=list(turn_starts or []))
 
 
 # --------------------------------------------------------------------------
@@ -619,6 +654,9 @@ def render_console(rep: Report) -> str:
     L.append("")
     L.append("-" * 72)
     L.append(f"  {rep.score_line}")
+    if rep.warmth_path:
+        L.append(f"  BUYER TEMPERATURE:  {' -> '.join(str(w) for w in rep.warmth_path)}"
+                 f"   (starts 50; he warms when you land the beat)")
     L.append(f"  WOULD REENA BUY IT?  {rep.verdict}")
     L.append("-" * 72)
     L.append("")
@@ -634,6 +672,9 @@ def render_markdown(rep: Report, session_id: str, wav_name: str) -> str:
     L.append(f"- **Result:** {rep.score_line}")
     L.append(f"- **Verdict:** {rep.verdict}")
     L.append(f"- **Audio:** `{wav_name}`")
+    if rep.warmth_path:
+        L.append("- **Buyer temperature:** "
+                 + " &rarr; ".join(str(w) for w in rep.warmth_path))
     L.append("")
     L.append("## The five criteria")
     L.append("")
