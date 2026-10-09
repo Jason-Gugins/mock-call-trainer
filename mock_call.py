@@ -373,6 +373,16 @@ def _persist(outdir: Path, session_id: str, state: CallState, args,
             sf.write(str(outdir / "session.wav"),
                      (full / peak * 0.95).astype(np.float32), SR)
 
+            # Single-file HTML listen-back report (Task 7): same audio, 16-bit
+            # PCM to keep the base64 embed a sane size.
+            import io
+            import listenback
+            buf = io.BytesIO()
+            sf.write(buf, (full / peak * 0.95 * 32767).astype(np.int16), SR,
+                     format="WAV", subtype="PCM_16")
+            (outdir / "session.html").write_text(
+                listenback.render(session_id, report, buf.getvalue()), encoding="utf-8")
+
     (outdir / "report.md").write_text(
         grader.render_markdown(report, session_id, "session.wav"), encoding="utf-8")
     grader.append_history(SESSIONS / "history.csv", session_id, report)
@@ -380,6 +390,7 @@ def _persist(outdir: Path, session_id: str, state: CallState, args,
     print(f"\n  Report:  {outdir / 'report.md'}")
     if not text_mode:
         print(f"  Audio:   {outdir / 'session.wav'}")
+        print(f"  Listen:  {outdir / 'session.html'}")
     print(f"  History: {SESSIONS / 'history.csv'}\n")
     state.persisted = True
 
