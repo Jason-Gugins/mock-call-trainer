@@ -51,13 +51,15 @@ def _api_key() -> str:
     return os.environ.get("OPENROUTER_API_KEY", "").strip()
 
 
-def _default_transport(path: str, payload: Dict, timeout: float = 60.0):
+def _default_transport(path: str, payload: Dict, timeout: float = 60.0,
+                       method: str = "POST"):
     global _last_auth
     _last_auth = f"Bearer {_api_key()}"
     headers = {"Authorization": _last_auth, "Content-Type": "application/json",
                **_APP_HEADERS}
-    req = urllib.request.Request(BASE + path, data=json.dumps(payload).encode(),
-                                 headers=headers, method="POST")
+    data = json.dumps(payload).encode() if method == "POST" else None
+    req = urllib.request.Request(BASE + path, data=data,
+                                 headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read()
@@ -69,7 +71,7 @@ def _default_transport(path: str, payload: Dict, timeout: float = 60.0):
 
 
 def _request(path, payload, transport=None, retries=2, parse_json=True,
-             timeout=60.0):
+             timeout=60.0, method: str = "POST"):
     if not _api_key():
         raise OpenRouterError(
             "OPENROUTER_API_KEY is not set. export OPENROUTER_API_KEY=<key> "
@@ -80,7 +82,8 @@ def _request(path, payload, transport=None, retries=2, parse_json=True,
     last: Optional[Exception] = None
     for attempt in range(retries + 1):
         try:
-            raw = send(path, payload)
+            raw = send(path, payload) if transport is not None \
+                else send(path, payload, timeout=timeout, method=method)
             # injected transports may hand back already-parsed JSON; only
             # decode raw payloads (the default urllib transport returns bytes)
             if parse_json and isinstance(raw, (bytes, bytearray, str)):
@@ -128,11 +131,12 @@ def tts(text: str, transport=None, voice: Optional[str] = "flux-bree-en") -> byt
 
 
 def list_models(transport=None) -> List[str]:
-    data = _request("/models", {}, transport=transport)
+    data = _request("/models", {}, transport=transport, method="GET")
     return [m["id"] for m in data.get("data", [])]
 
 
 def list_tts_models(transport=None) -> List[str]:
     """TTS models appear ONLY under the speech output-modality filter."""
-    data = _request("/models?output_modalities=speech", {}, transport=transport)
+    data = _request("/models?output_modalities=speech", {},
+                    transport=transport, method="GET")
     return [m["id"] for m in data.get("data", [])]
