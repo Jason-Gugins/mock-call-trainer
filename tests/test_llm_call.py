@@ -94,6 +94,7 @@ class LlmCallTests(unittest.TestCase):
         t = _Scripted(["Sure, make it quick, on-sale week.",
                        "We manage, honestly.",
                        "Send me something in writing first.",
+                       "Maybe. What would it show me?",
                        "Alright, Thursday works. Send the invite.\n[[HANGUP]]"])
         lines = ["Hi, got a minute?", "Are you handling this by hand?",
                  "What does that cost you?", "Thursday at 10 or Friday at 2?"]
@@ -135,7 +136,11 @@ class LlmCallTests(unittest.TestCase):
             self.assertEqual(rows[0]["fallback"], "Y")
 
     def test_dry_pipe_saves_partial_gracefully(self):
-        t = _Scripted(["Sure, go ahead."])
+        # Enough buyer lines that the BUYER never hangs up: the piped input
+        # running dry (EOF) is what ends this call -> graceful PARTIAL save.
+        t = _Scripted(["Sure, go ahead.", "We manage, honestly.",
+                       "Send me something in writing first.",
+                       "Alright.", "Okay."])
         with tempfile.TemporaryDirectory() as tmp:
             self._run(tmp, t, ["Hi Susie."])       # input runs dry after 1 turn
             md = list(Path(tmp).glob("**/report.md"))[0].read_text(encoding="utf-8")
