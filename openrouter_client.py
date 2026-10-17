@@ -99,10 +99,14 @@ def _request(path, payload, transport=None, retries=2, parse_json=True,
                           f"attempts: {last}")
 
 
+def resolved_chat_model(model: Optional[str] = None) -> str:
+    """The chat model a call will actually use (for logs/history accuracy)."""
+    return model or os.environ.get("OPENROUTER_MODEL") or "z-ai/glm-5.3-flash"
+
+
 def chat(messages: List[Dict], model: Optional[str] = None, transport=None,
          max_tokens: int = 120, temperature: float = 0.8) -> str:
-    payload = {"model": model or os.environ.get("OPENROUTER_MODEL")
-               or "z-ai/glm-5.3-flash",
+    payload = {"model": resolved_chat_model(model),
                "messages": messages, "max_tokens": max_tokens,
                "temperature": temperature,
                # a reasoning-mode reply can burn a 120-token budget on hidden

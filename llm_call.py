@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import os
 import random
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -47,7 +48,7 @@ import profiles
 import riq_briefs
 import riq_grade
 import riq_prompts
-from openrouter_client import OpenRouterError, chat, tts
+from openrouter_client import OpenRouterError, chat, resolved_chat_model, tts
 
 import mock_call
 
@@ -145,9 +146,11 @@ def _persist(outdir: Path, session_id: str, state: LlmCallState, brief,
              args, text_mode: bool) -> None:
     # Idempotent: the EOF/exception nets and the normal exit all funnel here;
     # a second run would duplicate the llm_history.csv row and re-print the
-    # scorecard.
+    # scorecard. The session dir is created lazily so an abandoned-before-dial
+    # Ctrl+C leaves no empty folder behind.
     if state.persisted:
         return
+    outdir.mkdir(parents=True, exist_ok=True)
     report = riq_grade.grade_riq(state.turns, brief, difficulty=args.difficulty,
                                  model=state.model, fallback=state.fallback)
     report.turn_starts = list(state.turn_starts)
@@ -213,8 +216,8 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
 
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     outdir = SESSIONS / "llm" / session_id
-    outdir.mkdir(parents=True, exist_ok=True)
 
+    model_used = resolved_chat_model(getattr(args, "llm_model", None))
     print()
     print("=" * 72)
     print(f"  RIQ LLM COLD CALL  --  brief {brief.id}  --  {difficulty.upper()}")
@@ -222,8 +225,7 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     # The candidate sees the brief at dial time, like the real interview's
     # 120-second prep grid.
     print(riq_prompts.brief_card(brief))
-    print(f"  Buyer brain: OpenRouter chat "
-          f"({getattr(args, 'llm_model', '') or 'default model'}), "
+    print(f"  Buyer brain: OpenRouter chat ({model_used}), "
           f"at most {max_turns} buyer replies. Grading stays deterministic.")
     print("=" * 72)
     print()
@@ -242,17 +244,22 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
             args.model, beam=1 if args.fast else 5,
             initial_prompt=profile.whisper_primer)
 
-    state = LlmCallState(model=getattr(args, "llm_model", "") or "")
+    state = LlmCallState(model=model_used)
     messages: List[Dict] = [{"role": "system", "content": riq_prompts.build_system_prompt(
         brief, difficulty=difficulty, caller_company=DEFAULT_CALLER_COMPANY,
         max_turns=max_turns)}]
     warmth = grader.WARMTH_START
     pause = np.zeros(int(0.35 * mock_call.SR), dtype=np.float32)
 
-    # Dial: the pickup comes from the LLM (turn 1 of the cap, silence prompt).
-    raw = _next_buyer_line(state, messages, "", warmth, 1, max_turns,
-                           difficulty, script_rng, profile, state.model,
-                           transport)
+    # Dial: the pickup comes from the LLM (buyer reply 1 of the cap).
+    try:
+        raw = _next_buyer_line(state, messages, "", warmth, 1, max_turns,
+                               difficulty, script_rng, profile, state.model,
+                               transport)
+    except KeyboardInterrupt:
+        # Nothing persisted yet -- do not claim a partial save.
+        print("\n\n  Call abandoned before the buyer picked up.\n")
+        sys.exit(130)
     hung_up = riq_prompts.is_hangup(raw)
     if hung_up:
         print("\n  *click* (the buyer hung up immediately)\n")
@@ -264,7 +271,9 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
             state.segments.append(pause)
         print()
     try:
-        for turn in range(1, max_turns + 1):
+        # The pickup was buyer reply 1 of the cap; candidate turn N gets
+        # buyer reply N+1, so the loop stops one short of the cap.
+        for turn in range(1, max_turns):
             if hung_up:
                 break
             q_so_far = sum(grader.count_discovery_questions(t.text)
@@ -310,7 +319,7 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
             warmth = grader.warmth_update(warmth, grader.has_question(said))
 
             # ---- buyer reply (RAW text; meta lines still inside) ----------------
-            raw = _next_buyer_line(state, messages, said, warmth, turn,
+            raw = _next_buyer_line(state, messages, said, warmth, turn + 1,
                                    max_turns, difficulty, script_rng, profile,
                                    state.model, transport)
             if riq_prompts.is_hangup(raw):

@@ -658,6 +658,12 @@ def main() -> None:
         except KeyboardInterrupt:
             print("\n\n  Call abandoned -- partial session saved.\n")
             sys.exit(130)
+        except KeyError as exc:
+            print(f"\n  Unknown brief {exc} -- run --list-briefs for the ids.\n")
+            sys.exit(2)
+        except Exception as exc:                      # noqa: BLE001
+            print(failure_hint(exc))
+            sys.exit(2)
         return
 
     if args.list_profiles:

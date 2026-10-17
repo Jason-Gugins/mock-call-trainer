@@ -166,6 +166,41 @@ genuinely different. Start over with `--reset-bank`, or re-harvest from your rep
 
 ---
 
+## LLM mode: a live prospect (`--llm`)
+
+The offline trainer improvises within a script; **`--llm` hands the phone to a real
+language model**. The buyer is played by GLM 5.3-Flash over OpenRouter, master-prompted
+with the RIQ framework (external trigger + internal signal + status-quo challenge), the
+signal-selling trigger taxonomy, the objection grid, and the listening discipline — so
+it plays a trained prospect: warms when you mirror and earn it, cools when you pitch
+features or stack questions, objects along the grid, and hangs up when the arc completes.
+
+```powershell
+.\.venv\Scripts\python.exe mock_call.py --llm                       # seeded random brief
+.\.venv\Scripts\python.exe mock_call.py --llm --brief A1            # Susie, theatre marketing
+.\.venv\Scripts\python.exe mock_call.py --list-briefs               # all 12 (6 personas x V1/V2)
+.\.venv\Scripts\python.exe mock_call.py --llm --text                # type instead of speak
+.\.venv\Scripts\python.exe mock_call.py --llm-check                 # verify key + models
+```
+
+You get the persona brief at dial time — the same 120-second prep grid as a real
+interview (R / I / Q skeleton / CTA) — then it's a live call. Grading stays fully
+deterministic and RIQ-only: five criteria (permissive opener, brief-scoped hook,
+challenge question, CTA, listening) plus the same leak metrics as the offline trainer.
+Every LLM rep lands in `sessions/llm/<timestamp>/` (report.md + session.html) and
+`llm_history.csv`, kept separate from the offline funnel.
+
+**Setup:** put `OPENROUTER_API_KEY=<key>` in a `.env` next to `mock_call.py` (gitignored)
+or in your environment; `--llm-check` confirms the key and that the configured models
+exist. **Costs:** chat is ~$0.002/rep on glm-5.3-flash; the buyer's voice uses
+`deepgram/flux-tts` (~5–8¢/rep) with the Windows voice as automatic fallback.
+**Privacy:** your audio stays local (whisper runs offline); your transcribed words go
+to OpenRouter during the call. **Resilience:** if the API dies mid-call, the offline
+scripted persona finishes the rep and the report is stamped FALLBACK — a rep is never
+lost to the network.
+
+---
+
 ## What it grades
 
 **Procore's five published criteria** (their exact scoring sheet):
@@ -241,6 +276,12 @@ banned words, freezes), run `python trend.py`.
 | `--list-profiles` | List registered profiles and exit. |
 | `--voice` | Buyer TTS voice (SAPI name, or any part of one). Default: the profile's own voice. |
 | `--list-voices` | List installed Windows TTS voices and exit. |
+| `--llm` | LLM buyer mode: an OpenRouter-model prospect + RIQ briefs (needs `OPENROUTER_API_KEY`). |
+| `--brief` | LLM mode: persona brief id (A1..F2); default is a seeded pick. `--list-briefs` shows all. |
+| `--list-briefs` | LLM mode: list the 12 persona briefs and exit. |
+| `--max-turns` | LLM mode: maximum buyer replies per call (default 16). |
+| `--llm-model` | LLM mode: OpenRouter chat model override (default `$OPENROUTER_MODEL`). |
+| `--llm-check` | LLM mode: verify the API key and that the configured chat/TTS models exist, then exit. |
 | `--objection` | Objection first-15-seconds reflex drill: label, negative-reverse, or feel/felt/found within 2s. |
 | `--star` | STAR story drill: each answer needs a number + a full situation/task/action/result arc, ~60s. |
 | `--narrative` | Career-narrative drill: why sales / why this company / the 2018-2023 gap answer. |
@@ -299,6 +340,12 @@ Get-Content .\tests\weak_call.txt | .\.venv\Scripts\python.exe mock_call.py --te
 | `regrade.py` | Re-score saved sessions with the current grader (profile-aware) |
 | `trend.py` | Cross-session progress view of history.csv (optional `--profile`) |
 | `listenback.py` | Renders the single-file `session.html` listen-back player |
+| `riq_briefs.py` | The 12 RIQ persona briefs (6 personas x V1/V2) from the interview playbooks |
+| `riq_prompts.py` | The RIQ master prompt template for the LLM buyer (pure builders) |
+| `riq_grade.py` | Deterministic RIQ scoring + `llm_history.csv` |
+| `openrouter_client.py` | Stdlib OpenRouter client (chat + TTS + model lists, injectable transport) |
+| `llm_call.py` | The `--llm` call loop (LLM buyer, TTS, scripted fallback, crash-safe persist) |
+| `llm.bat` | Double-click LLM-mode launcher |
 | `run.bat` | Double-click launcher |
 | `drill.bat` | Double-click pain-reveal drill |
 | `paraphrase.bat` | Double-click paraphrase drill |
