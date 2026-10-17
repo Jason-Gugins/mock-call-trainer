@@ -184,7 +184,10 @@ features or stack questions, objects along the grid, and hangs up when the arc c
 ```
 
 You get the persona brief at dial time — the same 120-second prep grid as a real
-interview (R / I / Q skeleton / CTA) — then it's a live call. Grading stays fully
+interview (R / I / Q skeleton / CTA) — then it's a live call. In voice mode the mic
+is **gated**: press ENTER to dial, then press any key when you're ready to answer —
+thinking time before the keypress is free, the recording starts when the mic opens
+(`--no-ready-gate` restores realistic cold timing). Grading stays fully
 deterministic and RIQ-only: five criteria (permissive opener, brief-scoped hook,
 challenge question, CTA, listening) plus the same leak metrics as the offline trainer.
 Every LLM rep lands in `sessions/llm/<timestamp>/` (report.md + session.html) and

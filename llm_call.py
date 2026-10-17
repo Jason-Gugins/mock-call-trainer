@@ -212,6 +212,27 @@ def _persist(outdir: Path, session_id: str, state: LlmCallState, brief,
 # The call
 # --------------------------------------------------------------------------
 
+def _ready_gate() -> None:
+    """Block until the caller arms the mic: any keypress on Windows (msvcrt),
+    ENTER elsewhere. Thinking time before arming is free — the recorder only
+    measures onset from when the mic actually opens."""
+    if sys.platform == "win32":
+        try:
+            import msvcrt
+            print("  [press any key when you're ready — the mic opens on "
+                  "keypress]", end="", flush=True)
+            key = msvcrt.getch()
+            if key in (b"\x00", b"\xe0"):
+                msvcrt.getch()                 # arrow/function keys send a 2nd byte
+            if key == b"\x03":                     # Ctrl+C
+                raise KeyboardInterrupt
+            print("\r" + " " * 64 + "\r", end="")
+            return
+        except ImportError:
+            pass
+    input("  [press ENTER when you're ready — the mic opens on keypress] ")
+
+
 def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     brief = riq_briefs.get_brief(args.brief)   # unknown brief -> clean KeyError
     max_turns = int(getattr(args, "max_turns", 0) or 16)   # never args.reps
@@ -265,6 +286,21 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     warmth = grader.WARMTH_START
     pause = np.zeros(int(0.35 * mock_call.SR), dtype=np.float32)
 
+    # Dial gate: reading the brief is free. Calibration + the whisper model
+    # load happen after ENTER, so transcription isn't cold on turn 1.
+    if not text_mode:
+        print()
+        try:
+            input("  Read the brief. Press ENTER to dial... ")
+        except KeyboardInterrupt:
+            print("\n\n  Call abandoned before it started.\n")
+            sys.exit(130)
+        except EOFError:
+            print("\n\n  No input (dry pipe). Call never started.\n")
+            sys.exit(130)
+        recorder.calibrate()
+        transcriber._load()
+
     # Dial: the pickup comes from the LLM (buyer reply 1 of the cap).
     try:
         raw = _next_buyer_line(state, messages, "", warmth, 1, max_turns,
@@ -302,6 +338,11 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
                 recording = mock_call.Recording(np.zeros(0, dtype=np.float32),
                                                 None, 0.0, [], froze=not said)
             else:
+                # The ready gate: thinking time before arming is free — the
+                # recorder measures onset from when the mic opens, not from
+                # when the buyer finished. --no-ready-gate restores cold timing.
+                if not getattr(args, "no_ready_gate", False):
+                    _ready_gate()
                 recording = recorder.record_turn()
                 print("  transcribing...", end="", flush=True)
                 said = transcriber.transcribe(recording.audio)

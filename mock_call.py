@@ -643,6 +643,10 @@ def main() -> None:
                         "from OpenRouter TTS.")
     p.add_argument("--llm-check", action="store_true",
                    help="verify OPENROUTER_API_KEY + configured chat/TTS models, then exit")
+    p.add_argument("--no-ready-gate", action="store_true",
+                   help="LLM mode, voice only: open the mic the instant the buyer "
+                        "finishes (realistic cold timing) instead of waiting for a "
+                        "keypress")
     args = p.parse_args()
 
     if args.list_briefs:
