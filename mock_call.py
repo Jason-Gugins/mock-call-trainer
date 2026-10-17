@@ -615,7 +615,50 @@ def main() -> None:
                    help="buyer TTS voice (SAPI name or part of one; default: profile's)")
     p.add_argument("--list-voices", action="store_true",
                    help="list installed Windows TTS voices and exit")
+    p.add_argument("--llm", action="store_true",
+                   help="LLM buyer mode: OpenRouter brain + RIQ briefs (needs OPENROUTER_API_KEY)")
+    p.add_argument("--brief", default=None,
+                   help="RIQ brief id (A1..F2); default: seeded pick")
+    p.add_argument("--list-briefs", action="store_true",
+                   help="list RIQ persona briefs and exit")
+    p.add_argument("--max-turns", type=int, default=16,
+                   help="LLM mode: maximum buyer replies per call (default 16)")
+    p.add_argument("--llm-model", default=None,
+                   help="OpenRouter chat model override (default: $OPENROUTER_MODEL)")
+    p.add_argument("--llm-check", action="store_true",
+                   help="verify OPENROUTER_API_KEY + configured chat/TTS models, then exit")
     args = p.parse_args()
+
+    if args.list_briefs:
+        import riq_briefs
+        for b in riq_briefs.BRIEFS:
+            print(f"  {b.id}  {b.label}")
+        return
+    if args.llm_check:
+        import openrouter_client as OR
+        try:
+            chat_ids = set(OR.list_models())
+            tts_ids = set(OR.list_tts_models())
+        except OR.OpenRouterError as exc:
+            print(f"  {exc}")
+            sys.exit(2)
+        chat_model = os.environ.get("OPENROUTER_MODEL") or "z-ai/glm-5.3-flash"
+        tts_model = os.environ.get("OPENROUTER_TTS_MODEL") or "deepgram/flux-tts"
+        print(f"  {'OK ' if chat_model in chat_ids else 'MISSING '} chat  {chat_model}")
+        print(f"  {'OK ' if tts_model in tts_ids else 'MISSING '} tts   {tts_model}")
+        return
+    if args.llm:
+        import llm_call
+        import riq_briefs
+        if not args.brief:
+            args.brief = random.Random(args.seed).choice(
+                [b.id for b in riq_briefs.BRIEFS])
+        try:
+            llm_call.run_llm_call(args)
+        except KeyboardInterrupt:
+            print("\n\n  Call abandoned -- partial session saved.\n")
+            sys.exit(130)
+        return
 
     if args.list_profiles:
         print("Available profiles:")
