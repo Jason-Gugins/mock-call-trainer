@@ -19,6 +19,10 @@ _build_*.py
 .hermes/
 .zcode/
 
+# LLM mode secrets (never commit keys)
+.env
+*.key
+
 # OS / editor
 Thumbs.db
 .DS_Store
