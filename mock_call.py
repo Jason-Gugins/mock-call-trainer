@@ -624,7 +624,15 @@ def main() -> None:
     p.add_argument("--max-turns", type=int, default=16,
                    help="LLM mode: maximum buyer replies per call (default 16)")
     p.add_argument("--llm-model", default=None,
-                   help="OpenRouter chat model override (default: $OPENROUTER_MODEL)")
+                   help="LLM mode: chat model override (default: $OPENROUTER_MODEL, "
+                        "or $ZAI_MODEL with --buyer-provider zai)")
+    p.add_argument("--buyer-provider",
+                   default=os.environ.get("MOCKCALL_BRAIN_PROVIDER") or "openrouter",
+                   choices=["openrouter", "zai"],
+                   help="LLM mode: who plays the buyer's brain (default: "
+                        "$MOCKCALL_BRAIN_PROVIDER or openrouter). zai = your Z.ai "
+                        "Coding Plan (ZAI_API_KEY); the buyer's voice still comes "
+                        "from OpenRouter TTS.")
     p.add_argument("--llm-check", action="store_true",
                    help="verify OPENROUTER_API_KEY + configured chat/TTS models, then exit")
     args = p.parse_args()

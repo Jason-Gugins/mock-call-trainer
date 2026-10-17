@@ -94,3 +94,26 @@ class ModelListTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ZaiChatTests(unittest.TestCase):
+    """chat_zai: Z.ai Coding Plan buyer brain (separate platform from OpenRouter)."""
+
+    def test_success_payload_and_content(self):
+        t = _FakeTransport([{"choices": [{"message": {"content": "Go."}}]}])
+        with mock.patch.dict(os.environ, {"ZAI_API_KEY": "zai-key"}):
+            out = OR.chat_zai([{"role": "user", "content": "hi"}], transport=t)
+        self.assertEqual(out, "Go.")
+        path, payload = t.calls[0]
+        self.assertEqual(path, "/chat/completions")
+        self.assertEqual(payload["model"], "glm-5.3-flash")
+        # GLM emits reasoning_content before content: thinking must be OFF or a
+        # small max_tokens budget dies inside hidden reasoning (live-verified).
+        self.assertEqual(payload["thinking"], {"type": "disabled"})
+
+    def test_missing_key_is_actionable(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(OR.OpenRouterError) as ctx:
+                OR.chat_zai([{"role": "user", "content": "hi"}],
+                            transport=_FakeTransport([]))
+        self.assertIn("ZAI_API_KEY", str(ctx.exception))

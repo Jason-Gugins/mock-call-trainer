@@ -104,6 +104,55 @@ def resolved_chat_model(model: Optional[str] = None) -> str:
     return model or os.environ.get("OPENROUTER_MODEL") or "z-ai/glm-5.3-flash"
 
 
+ZAI_BASE = "https://api.z.ai/api/coding/paas/v4"
+ZAI_DEFAULT_MODEL = os.environ.get("ZAI_MODEL") or "glm-5.3-flash"
+
+
+def chat_zai(messages: List[Dict], model: Optional[str] = None, transport=None,
+             max_tokens: int = 120, temperature: float = 0.8) -> str:
+    """Buyer brain via the Z.ai Coding Plan (ZAI_API_KEY, endpoint
+    api.z.ai/api/coding/paas/v4) — runs on the subscription instead of
+    OpenRouter credits. GLM emits reasoning_content BEFORE content, so the
+    thinking switch must be off: with it on, a small max_tokens budget dies
+    inside hidden reasoning and content comes back empty (live-verified).
+    Raises OpenRouterError on any failure, so llm_call's fallback net is
+    provider-agnostic."""
+    payload = {"model": model or ZAI_DEFAULT_MODEL,
+               "messages": messages, "max_tokens": max_tokens,
+               "temperature": temperature,
+               "thinking": {"type": "disabled"}}
+    global _last_auth
+    key = os.environ.get("ZAI_API_KEY", "").strip()
+    if not key:
+        raise OpenRouterError(
+            "ZAI_API_KEY is not set. export ZAI_API_KEY=<key> (or put it in "
+            ".env next to mock_call.py), or use --buyer-provider openrouter.")
+    _last_auth = f"Bearer {key}"
+    headers = {"Authorization": _last_auth, "Content-Type": "application/json"}
+    last: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            if transport is not None:
+                raw = transport("/chat/completions", payload)
+            else:
+                req = urllib.request.Request(
+                    ZAI_BASE + "/chat/completions",
+                    data=json.dumps(payload).encode(), headers=headers,
+                    method="POST")
+                with urllib.request.urlopen(req, timeout=90) as r:
+                    raw = r.read()
+            data = json.loads(raw) if isinstance(raw, (bytes, bytearray, str)) \
+                else raw
+            return data["choices"][0]["message"]["content"].strip()
+        except OpenRouterError:
+            raise
+        except Exception as e:                     # noqa: BLE001  transient
+            last = e
+            if attempt < 2:
+                _sleep(0.8 * (attempt + 1))
+    raise OpenRouterError(f"Z.ai chat failed after 3 attempts: {last}")
+
+
 def chat(messages: List[Dict], model: Optional[str] = None, transport=None,
          max_tokens: int = 120, temperature: float = 0.8) -> str:
     payload = {"model": resolved_chat_model(model),

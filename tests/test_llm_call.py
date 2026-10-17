@@ -151,6 +151,26 @@ class LlmCallTests(unittest.TestCase):
             with self.assertRaises(KeyError):
                 self._run(tmp, _Scripted([]), ["x"], brief="Z9")
 
+    def test_zai_provider_runs_the_same_flow(self):
+        # --buyer-provider zai: the buyer brain runs on the Z.ai Coding Plan;
+        # the flow, fallback net, and history row are identical, and the model
+        # column records the Z.ai model name.
+        t = _Scripted(["Sure, make it quick, on-sale week.",
+                       "We manage, honestly.",
+                       "Send me something in writing first.",
+                       "Alright, Thursday works. Send the invite.\n[[HANGUP]]"])
+        lines = ["Hi, got a minute?", "Are you handling this by hand?",
+                 "What does that cost you?", "Thursday at 10 or Friday at 2?"]
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run(tmp, t, lines, buyer_provider="zai", llm_model=None)
+            rows = list(csv.DictReader(
+                (Path(tmp) / "llm_history.csv").open(encoding="utf-8")))
+            self.assertEqual(rows[0]["model"], "glm-5.3-flash")
+            self.assertEqual(rows[0]["fallback"], "N")
+            self.assertNotIn("FALLBACK",
+                             list(Path(tmp).glob("**/report.md"))[0]
+                             .read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

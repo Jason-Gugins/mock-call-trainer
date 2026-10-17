@@ -48,7 +48,8 @@ import profiles
 import riq_briefs
 import riq_grade
 import riq_prompts
-from openrouter_client import OpenRouterError, chat, resolved_chat_model, tts
+from openrouter_client import (OpenRouterError, chat, chat_zai,
+                               resolved_chat_model, tts)
 
 import mock_call
 
@@ -90,11 +91,14 @@ def _scripted_line(state: LlmCallState) -> str:
 def _next_buyer_line(state: LlmCallState, messages: List[Dict],
                      candidate_text: str, warmth: int, turn: int, max_turns: int,
                      difficulty: str, script_rng: random.Random, profile,
-                     model: str, transport: Optional[Callable]) -> str:
+                     model: str, transport: Optional[Callable],
+                     provider: str = "openrouter") -> str:
     """The buyer's next line — the RAW model text (any [[HANGUP]] meta still
     inside; the caller checks is_hangup BEFORE stripping or speaking).
 
-    Only the chat() call is API-bound. On OpenRouterError: one warning, the
+    provider: "openrouter" (default) or "zai" — the Z.ai Coding Plan endpoint
+    runs the buyer brain on the subscription instead of OpenRouter credits.
+    Only the chat call is API-bound. On OpenRouterError: one warning, the
     offline scripted persona takes over for the rest of the call (not the
     brief's character), and the report is stamped FALLBACK."""
     if state.fallback:
@@ -102,7 +106,10 @@ def _next_buyer_line(state: LlmCallState, messages: List[Dict],
     messages.append({"role": "user", "content": riq_prompts.build_turn_message(
         candidate_text, warmth, turn, max_turns)})
     try:
-        raw = chat(messages, model=model or None, transport=transport)
+        if provider == "zai":
+            raw = chat_zai(messages, model=model or None, transport=transport)
+        else:
+            raw = chat(messages, model=model or None, transport=transport)
     except OpenRouterError:
         state.fallback = True
         state.script = persona.build_script(difficulty, script_rng, profile)
@@ -217,7 +224,14 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     outdir = SESSIONS / "llm" / session_id
 
-    model_used = resolved_chat_model(getattr(args, "llm_model", None))
+    # Buyer brain provider: "openrouter" (default) or "zai" (Z.ai Coding Plan
+    # — the subscription runs the buyer brain; TTS still comes from OpenRouter).
+    provider = getattr(args, "buyer_provider", "") or "openrouter"
+    if provider == "zai":
+        model_used = (getattr(args, "llm_model", None)
+                      or os.environ.get("ZAI_MODEL") or "glm-5.3-flash")
+    else:
+        model_used = resolved_chat_model(getattr(args, "llm_model", None))
     print()
     print("=" * 72)
     print(f"  RIQ LLM COLD CALL  --  brief {brief.id}  --  {difficulty.upper()}")
@@ -225,7 +239,7 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     # The candidate sees the brief at dial time, like the real interview's
     # 120-second prep grid.
     print(riq_prompts.brief_card(brief))
-    print(f"  Buyer brain: OpenRouter chat ({model_used}), "
+    print(f"  Buyer brain: {provider} chat ({model_used}), "
           f"at most {max_turns} buyer replies. Grading stays deterministic.")
     print("=" * 72)
     print()
@@ -255,7 +269,7 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     try:
         raw = _next_buyer_line(state, messages, "", warmth, 1, max_turns,
                                difficulty, script_rng, profile, state.model,
-                               transport)
+                               transport, provider)
     except KeyboardInterrupt:
         # Nothing persisted yet -- do not claim a partial save.
         print("\n\n  Call abandoned before the buyer picked up.\n")
@@ -321,7 +335,7 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
             # ---- buyer reply (RAW text; meta lines still inside) ----------------
             raw = _next_buyer_line(state, messages, said, warmth, turn + 1,
                                    max_turns, difficulty, script_rng, profile,
-                                   state.model, transport)
+                                   state.model, transport, provider)
             if riq_prompts.is_hangup(raw):
                 # Checked on the RAW reply BEFORE anything is spoken, shown,
                 # or graded: a compliant lone [[HANGUP]] must never reach the
