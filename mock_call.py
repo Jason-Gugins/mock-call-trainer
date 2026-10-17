@@ -562,6 +562,14 @@ def list_devices() -> None:
 
 
 def main() -> None:
+    # .env must be live BEFORE the parser is built: argparse freezes defaults
+    # (--buyer-provider, etc.) when add_argument runs, and the values live in
+    # .env. Real environment variables always win (setdefault).
+    try:
+        import dotenvlite
+        dotenvlite.load()
+    except ImportError:                           # pragma: no cover
+        pass
     p = argparse.ArgumentParser(
         description="Mock cold call trainer (profile-driven: generic_saas default, procore, ...)",
         formatter_class=argparse.RawDescriptionHelpFormatter,

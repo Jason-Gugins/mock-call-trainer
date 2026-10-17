@@ -195,7 +195,10 @@ or in your environment; `--llm-check` confirms the key and that the configured m
 exist. **Costs:** chat is ~$0.002/rep on glm-5.3-flash; the buyer's voice uses
 `deepgram/flux-tts` (~5–8¢/rep) with the Windows voice as automatic fallback.
 **Privacy:** your audio stays local (whisper runs offline); your transcribed words go
-to OpenRouter during the call. **Resilience:** if the API dies mid-call, the offline
+to OpenRouter during the call. **Buyer brain provider:** default is OpenRouter;
+set `MOCKCALL_BRAIN_PROVIDER=zai` in `.env` (or pass `--buyer-provider zai`) to run
+the buyer on your Z.ai Coding Plan subscription instead — the buyer's voice still
+comes from OpenRouter TTS. **Resilience:** if the API dies mid-call, the offline
 scripted persona finishes the rep and the report is stamped FALLBACK — a rep is never
 lost to the network.
 

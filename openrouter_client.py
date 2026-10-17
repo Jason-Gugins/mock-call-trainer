@@ -27,18 +27,7 @@ class OpenRouterError(Exception):
     pass
 
 
-def _load_dotenv(path: Optional[Path] = None) -> None:
-    """Tiny stdlib .env loader (KEY=VALUE lines); real env always wins."""
-    p = path or (Path(__file__).resolve().parent / ".env")
-    if not p.exists():
-        return
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        os.environ.setdefault(k.strip(), v.strip().strip("'\""))
-
+from dotenvlite import load as _load_dotenv   # shared stdlib .env loader
 
 _load_dotenv()
 
