@@ -89,17 +89,29 @@ class LlmCallTests(unittest.TestCase):
             self.assertEqual(rows[0]["fallback"], "N")
 
     def test_hangup_line_is_not_spoken_or_graded(self):
-        t = _Scripted(["Alright, Thursday works. Send the invite.\n[[HANGUP]]"])
+        # The buyer's LAST reply carries [[HANGUP]]: it ends the call before
+        # reaching any speak/display path, after all four candidate turns.
+        t = _Scripted(["Sure, make it quick, on-sale week.",
+                       "We manage, honestly.",
+                       "Send me something in writing first.",
+                       "Alright, Thursday works. Send the invite.\n[[HANGUP]]"])
         lines = ["Hi, got a minute?", "Are you handling this by hand?",
                  "What does that cost you?", "Thursday at 10 or Friday at 2?"]
         with tempfile.TemporaryDirectory() as tmp:
             self._run(tmp, t, lines)
-            # the fake transport was called for the pickup + one reply; the
-            # hangup reply must never reach a TTS/display path — asserted by
-            # the call not crashing and the turn count matching candidate lines
             rows = list(csv.DictReader(
                 (Path(tmp) / "llm_history.csv").open(encoding="utf-8")))
             self.assertEqual(int(rows[0]["turns"]), len(lines))
+            # pickup + 3 spoken replies; the hangup reply never gets a 5th call
+            self.assertEqual(t.chat_calls, 5)
+
+    def test_instant_hangup_at_pickup_writes_empty_report(self):
+        t = _Scripted(["[[HANGUP]]"])
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run(tmp, t, ["Hello?"])     # EOF after 1 line; loop never runs
+            rows = list(csv.DictReader(
+                (Path(tmp) / "llm_history.csv").open(encoding="utf-8")))
+            self.assertEqual(int(rows[0]["turns"]), 0)
 
     def test_api_death_falls_back_to_scripted_buyer(self):
         class _Dies:

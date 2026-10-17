@@ -14,8 +14,9 @@ Loop shape (the implementation contract):
   - next_buyer_line returns the RAW model text. is_hangup is checked on the
     raw reply BEFORE anything is spoken, displayed, or graded — checking after
     strip_meta is the classic bug (a compliant lone [[HANGUP]] deletes itself).
-    A hangup reply ends the buyer's voice; the rep itself winds down at the
-    turn cap or a dry pipe (EOF), so a rep is never cut short mid-flow.
+    A hangup reply ENDS THE CALL (break), wherever it lands — including an
+    instant hangup at pickup (zero turns, report still written). Winding down
+    at the cap or a dry pipe are the only other endings.
   - recorder.record_turn() returns a mock_call.Recording (audio, onset,
     duration, gaps, froze); the grader.Turn is built FROM it
     (onset_latency=recording.onset, internal_gaps=recording.gaps,
@@ -252,16 +253,20 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     raw = _next_buyer_line(state, messages, "", warmth, 1, max_turns,
                            difficulty, script_rng, profile, state.model,
                            transport)
-    spoken = riq_prompts.strip_meta(raw)
-    print(f"{brief.persona}: {spoken}")
-    if not text_mode:
-        state.segments.append(_speak_buyer(spoken, voice, transport, state))
-        state.segments.append(pause)
-    print()
-
-    hung_up = False
+    hung_up = riq_prompts.is_hangup(raw)
+    if hung_up:
+        print("\n  *click* (the buyer hung up immediately)\n")
+    else:
+        spoken = riq_prompts.strip_meta(raw)
+        print(f"{brief.persona}: {spoken}")
+        if not text_mode:
+            state.segments.append(_speak_buyer(spoken, voice, transport, state))
+            state.segments.append(pause)
+        print()
     try:
         for turn in range(1, max_turns + 1):
+            if hung_up:
+                break
             q_so_far = sum(grader.count_discovery_questions(t.text)
                            for t in state.turns)
             # objections handled is 0 by definition: objection flags don't
@@ -311,12 +316,10 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
             if riq_prompts.is_hangup(raw):
                 # Checked on the RAW reply BEFORE anything is spoken, shown,
                 # or graded: a compliant lone [[HANGUP]] must never reach the
-                # TTS/display path. The rep itself winds down at the cap or a
-                # dry pipe; the buyer just goes quiet from here.
-                if not hung_up:
-                    hung_up = True
-                    print("\n  *click* (the buyer hung up)\n")
-                continue
+                # TTS/display path. The buyer hung up — the call is over.
+                hung_up = True
+                print("\n  *click* (the buyer hung up)\n")
+                break
             spoken = riq_prompts.strip_meta(raw)
             print(f"{brief.persona}: {spoken}")
             if not text_mode:
@@ -325,7 +328,8 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
                 state.segments.append(pause)
             print()
 
-        print("\n  *click* (turn cap reached)\n")
+        if not hung_up:
+            print("\n  *click* (turn cap reached)\n")
     except EOFError:
         # Dry pipe in --text mode: the call is over, not crashed. Save what we
         # have and end the rep gracefully (KeyboardInterrupt et al. re-raise).
