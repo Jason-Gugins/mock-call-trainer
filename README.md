@@ -207,6 +207,65 @@ lost to the network.
 
 ---
 
+## Drills
+
+### RIQ prep grid (`--grid`)
+
+The interview's first exercise, rehearsed against the clock. A **redacted brief
+card** — persona, title, their world, the signal you can see — hits the screen
+and a 120-second prep clock starts (the challenge hint and the external trigger
+stay hidden: building R, the industry pressure, *is* the skill). You then
+deliver **opener + hook + challenge question in one turn**, and a deterministic
+six-element structure grade follows: permissive opener, an R term, an I term,
+a challenge question, ends on a question, no capability pitch. Briefs cycle
+through all 12 until you pin one with `--brief`. Works fully offline — no API
+key, no network, no model download.
+
+```powershell
+.\.venv\Scripts\python.exe mock_call.py --grid                  # 3 reps, briefs cycle
+.\.venv\Scripts\python.exe mock_call.py --grid --text --reps 3  # type instead of speak
+.\.venv\Scripts\python.exe mock_call.py --grid --brief A1       # pin one brief
+```
+
+Prep grades FAST ≤ 60s / OK ≤ 120s / SLOW — SLOW never hard-fails a rep; the
+structure grade is the pass. Every rep lands in `sessions/grid_history.csv`
+(console + history, no report.md on purpose).
+
+### Objection escalation drill (`--objection --llm`)
+
+The offline `--objection` drill fires scripted cues. Add `--llm` and the
+objections stay **the brief's real playbook objections** (local and predictable,
+so you can drill the same grid deliberately), but an LLM buyer now reacts in
+one in-character sentence after every answer and pushes harder each round.
+Grading stays deterministic and timed: a label, a negative-reverse, or
+feel/felt/found within 2 seconds — pitching capability is a MISS and cools the
+buyer. If the API is down or dies mid-drill it **silently degrades to pure
+local objections**: a dead network never costs a rep.
+
+```powershell
+.\.venv\Scripts\python.exe mock_call.py --objection --llm --brief A1
+.\.venv\Scripts\python.exe mock_call.py --objection --llm --brief A1 --text --reps 2
+```
+
+### A/B replay (`ab_diff.py`)
+
+Every rep writes a machine-readable `transcript.json` next to its report, so
+you can replay two reps of the **same brief** side by side. Run the identical
+command twice (the seed pins the objections and the script), then diff the two
+session folders: criteria with an up/down arrow each, shared leak deltas, and
+a beat-by-beat replay with divergent turns flagged.
+
+```powershell
+.\.venv\Scripts\python.exe mock_call.py --llm --brief A1 --seed 5   # rep A
+.\.venv\Scripts\python.exe mock_call.py --llm --brief A1 --seed 5   # rep B
+python ab_diff.py sessions/llm/<dirA> sessions/llm/<dirB>
+```
+
+Add `--json` to `ab_diff.py` for the whole diff as one machine-readable JSON
+object — handy for handing the comparison to an LLM.
+
+---
+
 ## What it grades
 
 **Procore's five published criteria** (their exact scoring sheet):
@@ -258,6 +317,11 @@ across reps the same way you'd track a funnel. For a per-session progression of 
 headline metrics (criteria/5, opener latency, ack %, filler rate, longest turn,
 banned words, freezes), run `python trend.py`.
 
+Progress views: `python progress.py --llm` breaks the LLM funnel down **per brief**
+(reps, mean criteria/5, weakest criterion, difficulty mix), and `python trend.py`
+now appends a trailing **`riq` column** (the LLM funnel's criteria/5, merged into
+the per-session view by session id).
+
 ---
 
 ## Options
@@ -288,7 +352,9 @@ banned words, freezes), run `python trend.py`.
 | `--max-turns` | LLM mode: maximum buyer replies per call (default 16). |
 | `--llm-model` | LLM mode: OpenRouter chat model override (default `$OPENROUTER_MODEL`). |
 | `--llm-check` | LLM mode: verify the API key and that the configured chat/TTS models exist, then exit. |
-| `--objection` | Objection first-15-seconds reflex drill: label, negative-reverse, or feel/felt/found within 2s. |
+| `--no-ready-gate` | LLM mode, voice only: open the mic the instant the buyer finishes (realistic cold timing) instead of waiting for a keypress. |
+| `--objection` | Objection first-15-seconds reflex drill: label, negative-reverse, or feel/felt/found within 2s. Combine with `--llm` for the escalation drill: the brief's real playbook objections plus an in-character LLM buyer that pushes harder each round. |
+| `--grid` | 120-second RIQ prep-grid drill: cold brief card -> build opener/hook/challenge in one turn -> graded six-element structure. Works fully offline. |
 | `--star` | STAR story drill: each answer needs a number + a full situation/task/action/result arc, ~60s. |
 | `--narrative` | Career-narrative drill: why sales / why this company / the 2018-2023 gap answer. |
 | `--reseed` | Re-harvest the paraphrase ban list from past session reports. |
@@ -341,6 +407,7 @@ Get-Content .\tests\weak_call.txt | .\.venv\Scripts\python.exe mock_call.py --te
 | `drill.py` | Pain-reveal drill loop (cost question + speed only) |
 | `paraphrase.py` | Paraphrase drill: beats, novelty scoring, the persisted ban list |
 | `objection.py` | Objection first-15s reflex drill |
+| `objection_llm.py` | The `--objection --llm` escalation drill: the brief's playbook objections + a one-sentence LLM buyer reaction per round, timed reflex grading |
 | `star.py` | STAR story drill |
 | `narrative.py` | Career-narrative + gap-answer drill |
 | `regrade.py` | Re-score saved sessions with the current grader (profile-aware) |
@@ -349,8 +416,11 @@ Get-Content .\tests\weak_call.txt | .\.venv\Scripts\python.exe mock_call.py --te
 | `riq_briefs.py` | The 12 RIQ persona briefs (6 personas x V1/V2) from the interview playbooks |
 | `riq_prompts.py` | The RIQ master prompt template for the LLM buyer (pure builders) |
 | `riq_grade.py` | Deterministic RIQ scoring + `llm_history.csv` |
+| `riq_grid.py` | The `--grid` 120-second RIQ prep-grid drill: redacted brief card -> one-turn opener/hook/challenge -> six-element structure grade |
 | `openrouter_client.py` | Stdlib OpenRouter client (chat + TTS + model lists, injectable transport) |
+| `dotenvlite.py` | Tiny `.env` loader: reads the `.env` next to `mock_call.py` into the environment (real environment variables always win) |
 | `llm_call.py` | The `--llm` call loop (LLM buyer, TTS, scripted fallback, crash-safe persist) |
+| `ab_diff.py` | A/B replay diff between two sessions' `transcript.json` files (criteria arrows, leak deltas, divergent turns; `--json` for machines) |
 | `llm.bat` | Double-click LLM-mode launcher |
 | `run.bat` | Double-click launcher |
 | `drill.bat` | Double-click pain-reveal drill |

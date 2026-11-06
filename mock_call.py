@@ -644,6 +644,9 @@ def main() -> None:
                    help="say the same idea a different way every time; reused wording is rejected")
     p.add_argument("--objection", action="store_true",
                    help="objection first-15s reflex drill: label, negative-reverse, feel/felt/found")
+    p.add_argument("--grid", action="store_true",
+                   help="120-second RIQ prep-grid drill: cold brief -> build "
+                        "opener/hook/challenge -> graded structure (works fully offline)")
     p.add_argument("--star", action="store_true",
                    help="STAR story drill: number + full situation/task/action/result arc")
     p.add_argument("--narrative", action="store_true",
@@ -713,6 +716,32 @@ def main() -> None:
         tts_model = os.environ.get("OPENROUTER_TTS_MODEL") or "deepgram/flux-tts"
         print(f"  {'OK ' if chat_model in chat_ids else 'MISSING '} chat  {chat_model}")
         print(f"  {'OK ' if tts_model in tts_ids else 'MISSING '} tts   {tts_model}")
+        return
+    if args.grid:
+        import riq_grid
+        try:
+            riq_grid.run_live(args)
+        except KeyboardInterrupt:
+            print("\n\n  Drill abandoned.\n")
+            sys.exit(130)
+        except KeyError as exc:
+            print(f"\n  Unknown brief {exc} -- run --list-briefs for the ids.\n")
+            sys.exit(2)
+        return
+    if args.objection and args.llm:
+        # Ordered before both the plain --llm dispatch below (which would
+        # otherwise swallow the combination) and the offline --objection
+        # dispatch further down: --objection --llm is the LLM escalation
+        # drill; plain --objection without --llm stays offline.
+        import objection_llm
+        try:
+            objection_llm.run_live(args)
+        except KeyboardInterrupt:
+            print("\n\n  Drill abandoned.\n")
+            sys.exit(130)
+        except KeyError as exc:
+            print(f"\n  Unknown brief {exc} -- run --list-briefs for the ids.\n")
+            sys.exit(2)
         return
     if args.llm:
         import llm_call
