@@ -52,6 +52,7 @@ from openrouter_client import (OpenRouterError, chat, chat_zai,
                                resolved_chat_model, tts)
 
 import mock_call
+from mock_call import ready_gate   # noqa: F401 — shared mic-arm seam, re-exported
 
 ROOT = Path(__file__).resolve().parent
 # Overridable so tests can't append to the real sessions/ or llm_history.csv.
@@ -212,27 +213,6 @@ def _persist(outdir: Path, session_id: str, state: LlmCallState, brief,
 # The call
 # --------------------------------------------------------------------------
 
-def _ready_gate() -> None:
-    """Block until the caller arms the mic: any keypress on Windows (msvcrt),
-    ENTER elsewhere. Thinking time before arming is free — the recorder only
-    measures onset from when the mic actually opens."""
-    if sys.platform == "win32":
-        try:
-            import msvcrt
-            print("  [press any key when you're ready — the mic opens on "
-                  "keypress]", end="", flush=True)
-            key = msvcrt.getch()
-            if key in (b"\x00", b"\xe0"):
-                msvcrt.getch()                 # arrow/function keys send a 2nd byte
-            if key == b"\x03":                     # Ctrl+C
-                raise KeyboardInterrupt
-            print("\r" + " " * 64 + "\r", end="")
-            return
-        except ImportError:
-            pass
-    input("  [press ENTER when you're ready — the mic opens on keypress] ")
-
-
 def run_llm_call(args, transport: Optional[Callable] = None) -> None:
     brief = riq_briefs.get_brief(args.brief)   # unknown brief -> clean KeyError
     max_turns = int(getattr(args, "max_turns", 0) or 16)   # never args.reps
@@ -342,7 +322,7 @@ def run_llm_call(args, transport: Optional[Callable] = None) -> None:
                 # recorder measures onset from when the mic opens, not from
                 # when the buyer finished. --no-ready-gate restores cold timing.
                 if not getattr(args, "no_ready_gate", False):
-                    _ready_gate()
+                    mock_call.ready_gate()
                 recording = recorder.record_turn()
                 print("  transcribing...", end="", flush=True)
                 said = transcriber.transcribe(recording.audio)

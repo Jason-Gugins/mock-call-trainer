@@ -315,6 +315,28 @@ def hud_line(i: int, total: int, stage_id: str, questions: int,
             f"questions {questions} · objections handled {objections_handled}]")
 
 
+def ready_gate() -> None:
+    """Block until the caller arms the mic: any keypress on Windows (msvcrt),
+    ENTER elsewhere. Thinking time before arming is free — the recorder only
+    measures onset from when the mic actually opens. Shared seam: llm_call
+    and the wave-2 drills all arm the mic through this one gate."""
+    if sys.platform == "win32":
+        try:
+            import msvcrt
+            print("  [press any key when you're ready — the mic opens on "
+                  "keypress]", end="", flush=True)
+            key = msvcrt.getch()
+            if key in (b"\x00", b"\xe0"):
+                msvcrt.getch()                 # arrow/function keys send a 2nd byte
+            if key == b"\x03":                     # Ctrl+C
+                raise KeyboardInterrupt
+            print("\r" + " " * 64 + "\r", end="")
+            return
+        except ImportError:
+            pass
+    input("  [press ENTER when you're ready — the mic opens on keypress] ")
+
+
 def failure_hint(exc: Exception) -> str:
     """One actionable line-set for the failures we actually see in the wild."""
     cls = type(exc).__name__.lower()

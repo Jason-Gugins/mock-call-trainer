@@ -50,6 +50,13 @@ LOW_FRICTION_RE = (r"\bsend (you|me) (the |a )?(one|2|two)[- ]pager?\b"
 CALLBACK_RE = (r"\bi'?ll call (you )?(right )?(back|after)\b"
                r"|\bcall (me|you) (back|after|when)\b")
 
+# RIQ challenge shape ("how are you currently handling X without risking Y");
+# the real debrief call uses this phrasing. Public: the wave-2 drill modules
+# reuse the same challenge detection.
+RIQ_CHALLENGE_RE = (r"\bhow (are|do|did) you (currently |actually )?"
+                    r"(handling|getting|keeping|tracking|telling|vetting|planning"
+                    r"|deploying|marketing)\b")
+
 
 @dataclass
 class RiqCriterion:
@@ -140,13 +147,9 @@ def grade_riq(turns: List[grader.Turn], brief, difficulty: str = "normal",
                           "named THIS brief's R and I in your words", hook_ev)
 
     qcount = sum(grader.count_discovery_questions(t.text) for t in turns)
-    # RIQ challenge shape ("how are you currently handling X without risking Y")
-    # plus the wave-1 implication bank; the real debrief call uses this phrasing.
-    CHALLENGE_RE = (r"\bhow (are|do|did) you (currently |actually )?"
-                    r"(handling|getting|keeping|tracking|telling|vetting|planning"
-                    r"|deploying|marketing)\b")
+    # RIQ challenge pattern + the wave-1 implication bank.
     impl = any(grader.has_implication_question(t.text)
-               or re.search(CHALLENGE_RE, t.text.lower()) for t in turns)
+               or re.search(RIQ_CHALLENGE_RE, t.text.lower()) for t in turns)
     c_challenge = RiqCriterion(
         "riq_challenge", "Challenge question (cost/status quo)",
         STRONG if impl else FAIL,
