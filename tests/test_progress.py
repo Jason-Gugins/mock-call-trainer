@@ -4,6 +4,7 @@ import csv, sys, tempfile, unittest, unittest.mock as mock
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import progress as P
+import trend as T
 
 
 def _write(path, header, rows):
@@ -124,6 +125,135 @@ class Main(unittest.TestCase):
             out = stdout.getvalue()
             self.assertIn("trend", out)
             self.assertTrue(any(x in out for x in ("improving", "plateau", "declining")))
+
+
+class Llm(unittest.TestCase):
+    """The LLM funnel: sessions/llm_history.csv (global - it has no profile column)."""
+
+    def test_llm_series_mapping(self):
+        rows = [{"criteria_passed": "4", "riq_hook": "STRONG", "riq_challenge": "PASS",
+                 "riq_cta": "FAIL", "fallback": "N"},
+                {"criteria_passed": "5", "riq_hook": "PASS", "riq_challenge": "STRONG",
+                 "riq_cta": "PASS", "fallback": "Y"},
+                {"criteria_passed": "0", "riq_hook": "FAIL", "riq_challenge": "",
+                 "riq_cta": "", "fallback": "N"}]
+        s = P.llm_series(rows)
+        self.assertEqual(s["riq_pass_%"], [80.0, 100.0, 0.0])        # criteria/5*100
+        self.assertEqual(s["hook_%"], [100.0, 50.0, 0.0])            # STRONG/PASS/FAIL
+        self.assertEqual(s["challenge_%"], [50.0, 100.0, 0.0])       # blank -> 0.0
+        self.assertEqual(s["cta_%"], [0.0, 50.0, 0.0])               # missing key -> 0.0
+        self.assertEqual(s["fallback_free_%"], [100.0, 0.0, 100.0])  # N=free, Y=fallback
+
+    def test_sources_lists_llm_last(self):
+        self.assertEqual(P.SOURCES[-1], ("llm", "llm_history.csv", P.llm_series))
+
+    def test_collect_reads_llm_rows_despite_profile_filter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Path(tmp)
+            _write(s / "llm_history.csv",
+                   ["session", "brief", "criteria_passed", "riq_hook",
+                    "riq_challenge", "riq_cta", "fallback"],
+                   [["s1", "C1", "4", "STRONG", "PASS", "FAIL", "N"],
+                    ["s2", "B2", "5", "STRONG", "STRONG", "STRONG", "N"]])
+            with mock.patch.object(P, "SESSIONS", s):
+                series, notes = P.collect("levitate")
+        self.assertEqual(series["riq_pass_%"], [80.0, 100.0])   # no profile column -> kept
+        self.assertEqual(series["hook_%"], [100.0, 100.0])
+        self.assertNotIn("llm: no rows yet", notes)
+
+    def test_llm_by_brief_groups_and_finds_weakest(self):
+        rows = [
+            {"brief": "C1", "criteria_passed": "2", "riq_hook": "FAIL",
+             "riq_challenge": "STRONG", "riq_cta": "PASS", "difficulty": "normal"},
+            {"brief": "C1", "criteria_passed": "4", "riq_hook": "PASS",
+             "riq_challenge": "STRONG", "riq_cta": "STRONG", "difficulty": "hostile"},
+            {"brief": "B2", "criteria_passed": "5", "riq_hook": "STRONG",
+             "riq_challenge": "STRONG", "riq_cta": "STRONG", "difficulty": "normal"},
+        ]
+        d = P.llm_by_brief(rows)
+        self.assertEqual(set(d), {"C1", "B2"})
+        self.assertEqual(d["C1"]["reps"], 2)
+        self.assertAlmostEqual(d["C1"]["mean_pass"], 3.0)
+        self.assertEqual(d["C1"]["weakest"], "riq_hook")   # mean 25 vs 100 vs 75
+        self.assertEqual(d["C1"]["mix"], "1N/1H")
+        self.assertEqual(d["B2"]["mean_pass"], 5.0)
+
+    def test_coach_grid_on_weak_hook(self):
+        self.assertIn("--grid  # build the R+I+Q cold", P.coach({"hook_%": 50.0}))
+
+    def test_coach_llm_reflex_and_close(self):
+        cmds = P.coach({"challenge_%": 50.0, "cta_%": 0.0})
+        self.assertIn("--objection --llm  # reflexes", cmds)
+        self.assertIn("--llm --brief <weakest>  # close with two times", cmds)
+
+
+class LlmView(unittest.TestCase):
+    """--llm: per-brief breakdown of the LLM funnel instead of the standard view."""
+
+    def test_main_llm_prints_per_brief_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Path(tmp)
+            _write(s / "llm_history.csv",
+                   ["session", "difficulty", "brief", "criteria_passed", "riq_hook",
+                    "riq_challenge", "riq_cta", "fallback"],
+                   [["s1", "normal", "C1", "2", "FAIL", "STRONG", "PASS", "N"],
+                    ["s2", "hostile", "C1", "4", "PASS", "STRONG", "STRONG", "N"],
+                    ["s3", "normal", "B2", "5", "STRONG", "STRONG", "STRONG", "N"]])
+            with mock.patch.object(P, "SESSIONS", s):
+                stdout = __import__("io").StringIO()
+                with mock.patch("sys.stdout", stdout):
+                    rc = P.main(["--llm"])
+            self.assertEqual(rc, 0)
+            out = stdout.getvalue()
+            self.assertIn("C1", out)
+            self.assertIn("B2", out)
+            self.assertIn("riq_hook", out)     # most-failed criterion, by name
+            self.assertIn("1N/1H", out)        # difficulty mix for C1
+            self.assertIn("3.0", out)          # C1 mean criteria (2+4)/2
+
+    def test_main_llm_no_rows_message_nothing_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Path(tmp)
+            with mock.patch.object(P, "SESSIONS", s):
+                stdout = __import__("io").StringIO()
+                with mock.patch("sys.stdout", stdout):
+                    rc = P.main(["--llm", "--write"])
+            self.assertEqual(rc, 0)
+            self.assertIn("No LLM funnel data", stdout.getvalue())
+            self.assertEqual(list(Path(tmp).rglob("*.md")), [])   # --write suppressed
+
+
+class TrendRiq(unittest.TestCase):
+    """trend.py gains a 'riq' headline column fed by llm_history.csv."""
+
+    def test_llm_riq_reads_sessions_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Path(tmp)
+            _write(s / "llm_history.csv", ["session", "criteria_passed"],
+                   [["s1", "4"], ["s2", ""], ["", "5"]])
+            with mock.patch.object(T, "SESSIONS", s):
+                self.assertEqual(T.llm_riq(), {"s1": 4.0})
+
+    def test_riq_column_aligned_by_session_and_llm_only_appended(self):
+        rows = [{"session": "s1", "criteria_passed": "4"},
+                {"session": "s2", "criteria_passed": "5"}]
+        out = T.tabulate(rows, llm={"s1": 4, "s9": 3})
+        lines = out.splitlines()
+        self.assertEqual(lines[0].split()[-1], "riq")                 # new last column
+        s1 = next(l for l in lines if l.startswith("s1"))
+        self.assertTrue(s1.rstrip().endswith("4"))                    # aligned by session id
+        s9 = next(l for l in lines if l.startswith("s9"))
+        self.assertEqual(s9.split()[0], "s9")                         # appended, not merged
+        self.assertEqual(s9.split().count("-"), len(T.HEADLINE) - 1)  # dashes offline
+        self.assertEqual(s9.split()[-1], "3")                         # riq score shown
+
+    def test_no_llm_data_leaves_dashes_and_keeps_table(self):
+        rows = [{"session": "s1", "profile": "levitate", "criteria_passed": "4"}]
+        out = T.tabulate(rows)
+        lines = out.splitlines()
+        self.assertIn("riq", lines[0])
+        s1 = next(l for l in lines if l.startswith("s1/levitate"))
+        self.assertEqual(s1.split()[-1], "-")
 
 
 if __name__ == "__main__":

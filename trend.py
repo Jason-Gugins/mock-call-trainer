@@ -6,6 +6,10 @@ progression of the headline metrics so the trend is visible at a glance.
 
     python trend.py
     MOCKCALL_SESSIONS=<dir> python trend.py   # different data dir
+
+The trailing riq column comes from sessions/llm_history.csv (the LLM funnel,
+which has no profile column), aligned by session id; llm-only sessions are
+appended with dashes for the offline columns.
 """
 from __future__ import annotations
 
@@ -27,6 +31,7 @@ HEADLINE = [
     ("banned_words", "banned"),
     ("freezes", "frz"),
     ("talk_time", "talk"),
+    ("riq", "riq"),  # llm_history.csv (global funnel), aligned by session id
 ]
 
 
@@ -60,11 +65,43 @@ def _fmt(v):
     return str(int(v)) if v == int(v) else f"{v:.1f}"
 
 
-def tabulate(rows) -> str:
+def llm_riq(path=None) -> dict:
+    """session -> criteria_passed from llm_history.csv (the global LLM funnel).
+    Rows without a session id or a parsable score are skipped."""
+    path = path if path is not None else SESSIONS / "llm_history.csv"
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    out = {}
+    for r in rows:
+        sess = (r.get("session") or "").strip()
+        crit = _num(r.get("criteria_passed"))
+        if sess and crit is not None:
+            out[sess] = crit
+    return out
+
+
+def tabulate(rows, llm=None) -> str:
+    """llm: session -> criteria_passed from llm_history.csv. Sessions present in
+    both CSVs get their riq score inline; llm-only sessions are appended with
+    dashes for the offline columns."""
+    merged = []
+    offline = set()
+    for r in rows:
+        r = dict(r)
+        sess = r.get("session", "?")
+        offline.add(sess)
+        if llm and sess in llm:
+            r["riq"] = str(llm[sess])
+        merged.append(r)
+    for sess, crit in (llm or {}).items():
+        if sess not in offline:
+            merged.append({"session": sess, "riq": str(crit)})
     header = "session" + " " * (32 - len("session")) + \
              " ".join(f"{label:>6}" for _, label in HEADLINE)
     lines = [header]
-    for r in rows:
+    for r in merged:
         sess = r.get("session", "?")
         prof = r.get("profile", "")
         label = f"{sess}/{prof}" if prof else sess
@@ -88,10 +125,11 @@ def main(argv=None) -> int:
         rows = list(csv.DictReader(fh))
     if args.profile:
         rows = [r for r in rows if r.get("profile") == args.profile]
-    print(tabulate(rows))
+    print(tabulate(rows, llm=llm_riq()))
     print("\nColumns: crit=criteria/5, open=opener latency s, obj-p=objection "
           "pause s, ack=ack % , fill=filler/100 words, long=longest turn words, "
-          "banned=banned word hits, frz=froze turns, talk=talk time s. '-' = no data.")
+          "banned=banned word hits, frz=froze turns, talk=talk time s, "
+          "riq=llm funnel criteria/5. '-' = no data.")
     return 0
 
 

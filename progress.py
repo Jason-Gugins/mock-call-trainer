@@ -2,6 +2,7 @@
 
     python progress.py --profile levitate
     python progress.py --profile levitate --write   # also writes PROGRESS.md
+    python progress.py --llm                        # per-brief LLM funnel breakdown
 
 Reads every history source, filters it to one profile, and shows each metric's
 "now" (mean of the last N rows), its goal, and whether the trend is improving /
@@ -35,11 +36,17 @@ GOALS = {
     "narrative_airtight_%": (100, False),
     "drill_hit_%": (100, False),
     "cost_fast_%": (100, False),
+    "riq_pass_%": (100, False),
+    "hook_%": (100, False),
+    "challenge_%": (100, False),
+    "cta_%": (100, False),
+    "fallback_free_%": (100, False),
 }
 
 ORDER = ["criteria/5", "opener_latency_s", "ack_rate_%", "filler_rate_per100",
          "reflex_%", "median_onset_s", "obj_ok_fast_%",
-         "star_solid_%", "narrative_airtight_%", "drill_hit_%", "cost_fast_%"]
+         "star_solid_%", "narrative_airtight_%", "drill_hit_%", "cost_fast_%",
+         "riq_pass_%", "hook_%", "challenge_%", "cta_%", "fallback_free_%"]
 
 
 def _csv_rows(path: Path) -> list:
@@ -93,12 +100,69 @@ def drill_series(rows):
     }
 
 
+LLM_HISTORY = "llm_history.csv"
+LLM_LEVEL = {"STRONG": 100.0, "PASS": 50.0, "FAIL": 0.0}
+_RIQ_COLUMNS = ("riq_hook", "riq_challenge", "riq_cta")
+_LLM_METRICS = frozenset(("riq_pass_%", "hook_%", "challenge_%", "cta_%",
+                          "fallback_free_%"))
+
+
+def _level(raw) -> float:
+    """STRONG -> 100, PASS -> 50, FAIL/blank/missing -> 0."""
+    return LLM_LEVEL.get((raw or "").strip(), 0.0)
+
+
+def llm_series(rows) -> dict:
+    """The LLM funnel (llm_history.csv) - global, the csv has no profile column.
+
+    riq_pass_% is criteria_passed/5 as a percent; hook/challenge/cta grade the
+    R+I+Q beats STRONG=100 / PASS=50 / FAIL=0 (missing/blank -> 0);
+    fallback_free_% is 100 when the rep ran without a model fallback ('N')."""
+    return {
+        "riq_pass_%": [float(r.get("criteria_passed") or 0) / 5 * 100 for r in rows],
+        "hook_%": [_level(r.get("riq_hook")) for r in rows],
+        "challenge_%": [_level(r.get("riq_challenge")) for r in rows],
+        "cta_%": [_level(r.get("riq_cta")) for r in rows],
+        "fallback_free_%": [100.0 if (r.get("fallback") or "").strip() == "N" else 0.0
+                            for r in rows],
+    }
+
+
+def llm_by_brief(rows) -> dict:
+    """brief -> {'reps', 'mean_pass', 'weakest', 'mix'} for the --llm view.
+
+    weakest is the lowest-mean of hook/challenge/cta by level (ties ->
+    riq_hook first); mix is the difficulty counts, most common first."""
+    grouped: dict = {}
+    for r in rows:
+        brief = (r.get("brief") or "").strip() or "?"
+        grouped.setdefault(brief, []).append(r)
+    out = {}
+    for brief, brows in grouped.items():
+        counts: dict = {}
+        for r in brows:
+            diff = (r.get("difficulty") or "").strip() or "?"
+            counts[diff] = counts.get(diff, 0) + 1
+        means = {c: statistics.fmean(_level(r.get(c)) for r in brows)
+                 for c in _RIQ_COLUMNS}
+        out[brief] = {
+            "reps": len(brows),
+            "mean_pass": statistics.fmean(float(r.get("criteria_passed") or 0)
+                                          for r in brows),
+            "weakest": min(means, key=means.get),
+            "mix": "/".join(f"{c}{d[0].upper()}"
+                            for d, c in sorted(counts.items(), key=lambda kv: -kv[1])),
+        }
+    return out
+
+
 SOURCES = [
     ("full calls", "history.csv", full_series),
     ("objection", "objection_history.csv", objection_series),
     ("star", "star_history.csv", star_series),
     ("narrative", "narrative_history.csv", narrative_series),
     ("drill", "drill_history.csv", drill_series),
+    ("llm", LLM_HISTORY, llm_series),
 ]
 
 
@@ -107,7 +171,11 @@ def collect(profile: str) -> tuple:
     series: dict = {}
     notes: list = []
     for label, fname, extract in SOURCES:
-        rows = _profile_rows(SESSIONS / fname, profile)
+        path = SESSIONS / fname
+        if fname == LLM_HISTORY:
+            rows = _csv_rows(path)  # global funnel: no profile column to filter on
+        else:
+            rows = _profile_rows(path, profile)
         if not rows:
             notes.append(f"{label}: no rows yet")
             continue
@@ -149,9 +217,36 @@ def coach(metrics: dict) -> list:
     if ((g("drill_hit_%") is not None and g("drill_hit_%") < 100) or
             (g("cost_fast_%") is not None and g("cost_fast_%") < 100)):
         cmds.append("--drill")
+    if g("hook_%") is not None and g("hook_%") < 100:
+        cmds.append("--grid  # build the R+I+Q cold")
+    if g("challenge_%") is not None and g("challenge_%") < 100:
+        cmds.append("--objection --llm  # reflexes")
+    if g("cta_%") is not None and g("cta_%") < 100:
+        cmds.append("--llm --brief <weakest>  # close with two times")
     if g("filler_rate_per100") is not None and g("filler_rate_per100") > 3:
         cmds.append("--star  # slow down, drop filler")
     return cmds
+
+
+def _llm_view() -> int:
+    """--llm: per-brief breakdown of the global LLM funnel (replaces the standard
+    view; nothing is ever written in this mode)."""
+    rows = _csv_rows(SESSIONS / LLM_HISTORY)
+    if not rows:
+        print("No LLM funnel data yet - run mock_call.py --llm for a graded rep. "
+              "Nothing written.")
+        return 0
+    by_brief = llm_by_brief(rows)
+    total = sum(v["reps"] for v in by_brief.values())
+    w = max([len("brief")] + [len(b) for b in by_brief])
+    lines = [f"LLM FUNNEL  per-brief  ({total} reps, global - not profile-filtered)", ""]
+    lines.append(f"{'brief':{w}} {'reps':>4} {'crit/5':>6} {'weakest':>14}  mix")
+    for brief in sorted(by_brief):
+        v = by_brief[brief]
+        lines.append(f"{brief:{w}} {v['reps']:>4} {v['mean_pass']:>6.1f} "
+                     f"{v['weakest']:>14}  {v['mix']}")
+    print("\n".join(lines))
+    return 0
 
 
 def main(argv=None) -> int:
@@ -159,7 +254,11 @@ def main(argv=None) -> int:
     ap.add_argument("--profile", default=None)
     ap.add_argument("--n", type=int, default=8, help="rows to average / trend (last N)")
     ap.add_argument("--write", action="store_true", help="also write PROGRESS.md")
+    ap.add_argument("--llm", action="store_true",
+                    help="per-brief breakdown of the LLM funnel instead of the standard view")
     args = ap.parse_args(argv)
+    if args.llm:
+        return _llm_view()
     profile = args.profile or profiles.DEFAULT_PROFILE
     n = max(args.n, 1)
 
@@ -185,6 +284,9 @@ def main(argv=None) -> int:
     lines.append("")
     for note in notes:
         lines.append(f"  [no data] {note}")
+    if _LLM_METRICS & set(series):
+        lines.append("  [note] llm funnel metrics are global - "
+                     "llm_history.csv has no profile column")
     lines.append("")
 
     practices = coach(now)
