@@ -32,6 +32,7 @@ Loop shape (the implementation contract):
 """
 from __future__ import annotations
 
+import json
 import os
 import random
 import sys
@@ -196,6 +197,19 @@ def _persist(outdir: Path, session_id: str, state: LlmCallState, brief,
         riq_grade.render_markdown(report, session_id,
                                   "session.wav" if wrote_audio else ""),
         encoding="utf-8")
+
+    # Machine-readable per-rep transcript (written regardless of text_mode):
+    # ab_diff.py reads this to replay two same-brief reps side by side.
+    (outdir / "transcript.json").write_text(json.dumps(
+        {"session": session_id, "kind": "llm", "brief": report.brief_id,
+         "difficulty": report.difficulty, "model": report.model,
+         "fallback": report.fallback,
+         "criteria": {c.key: c.level for c in report.criteria},
+         "leaks": {lk.key: lk.value for lk in report.leaks},
+         "verdict": report.verdict,
+         "turns": mock_call.turn_entries(state.turns)},
+        ensure_ascii=False, indent=1), encoding="utf-8")
+
     riq_grade.append_llm_history(SESSIONS / HISTORY_NAME, session_id, report,
                                  brief_id=brief.id, model=state.model,
                                  difficulty=args.difficulty)

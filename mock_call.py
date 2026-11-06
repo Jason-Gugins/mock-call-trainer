@@ -20,6 +20,7 @@ sessions/history.csv so you can watch the reps improve.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import random
 import subprocess
@@ -371,6 +372,18 @@ class CallState:
     persisted: bool = False
 
 
+def turn_entries(turns: List[Turn]) -> List[dict]:
+    """transcript.json's interleaved turn entries: the buyer prompt, then what
+    the rep actually said with the timing metrics. Shared by both persisters
+    (llm_call imports this module) so ab_diff.py can align the beats."""
+    entries: List[dict] = []
+    for t in turns:
+        entries.append({"i": t.index, "who": "buyer", "text": t.pm_line})
+        entries.append({"i": t.index, "who": "you", "text": t.text,
+                        "onset": t.onset_latency, "duration": t.duration})
+    return entries
+
+
 def _persist(outdir: Path, session_id: str, state: CallState, args,
              profile, text_mode: bool) -> None:
     # Idempotent: the failure_hint handlers persist before sys.exit(2), and the
@@ -408,6 +421,18 @@ def _persist(outdir: Path, session_id: str, state: CallState, args,
 
     (outdir / "report.md").write_text(
         grader.render_markdown(report, session_id, "session.wav"), encoding="utf-8")
+
+    # Machine-readable per-rep transcript: ab_diff.py reads this to replay two
+    # same-brief reps side by side (criteria/leaks maps + interleaved beats).
+    (outdir / "transcript.json").write_text(json.dumps(
+        {"session": session_id, "kind": "offline", "brief": profile.name,
+         "difficulty": report.difficulty, "model": "", "fallback": False,
+         "criteria": {c.key: c.level for c in report.criteria},
+         "leaks": {lk.key: lk.value for lk in report.leaks},
+         "verdict": report.verdict,
+         "turns": turn_entries(state.turns)},
+        ensure_ascii=False, indent=1), encoding="utf-8")
+
     grader.append_history(SESSIONS / "history.csv", session_id, report)
 
     print(f"\n  Report:  {outdir / 'report.md'}")
